@@ -74,3 +74,16 @@ def test_say_items_wait_for_the_agent():
 
 def test_parse_reply_reads_thoughts():
     assert questions.parse_reply("1b8: hmm 2?", 2) == [(1, "b8", "hmm"), (2, "?", "")]
+
+
+def test_a_chain_with_two_premises_forks_through_a_knot():
+    from reader import view
+    from reader.model import Model
+    from reader.records import Chain, Prop
+    from reader.store import Snapshot
+    props = {i: Prop(i, i, "s") for i in ("p_a", "p_b", "p_c", "p_d")}
+    chains = {"c_x": Chain("c_x", ("p_a", "p_b"), "p_c", "step")}
+    g = view.graph(Model(Snapshot(props, chains, [], []), DAY))
+    assert {n["id"] for n in g["nodes"] if n.get("knot")} == {"c_x"}
+    assert sorted((l["source"], l["target"], l["arrow"]) for l in g["links"]) == [
+        ("c_x", "p_c", True), ("p_a", "c_x", False), ("p_b", "c_x", False)]

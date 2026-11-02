@@ -20,6 +20,14 @@ conversation or self-report. A memory model (FSRS-6 for now) turns each idea's
 answers into R. The model is plain files: propositions (checkable claims),
 chains (premises that give a conclusion by a step), and one line per answer.
 
+## See it
+
+`reader graph` opens the whole model in the browser as a force-directed graph;
+`reader graph girsanov` shows just that neighbourhood. Nodes are coloured by
+R (grey: never asked), a chain is a fork from its premises to its conclusion,
+and clicking a node shows its statement and every answer. It follows the
+system's light or dark mode, with a toggle.
+
 ## Install
 
     uv tool install git+https://github.com/MarkKon/reader
@@ -55,6 +63,7 @@ when it has a remote).
 | `questions.py` | question blocks: parse, render, grade replies             |
 | `vault.py`     | the optional notes folder, read only                      |
 | `upkeep.py`    | lint, duplicates, calibration, backup, drafting           |
+| `view.py`      | the graph page (`reader graph`); template and vendored [force-graph](https://github.com/vasturiano/force-graph) (MIT) in `assets/` |
 | `cli.py`       | arguments and printing                                    |
 
 ## Test

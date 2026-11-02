@@ -16,8 +16,10 @@ import re
 import shutil
 import subprocess
 import sys
+import webbrowser
+from pathlib import Path
 
-from . import config, questions, upkeep
+from . import config, questions, upkeep, view
 from .memory import Recall
 from .model import Model
 from .records import GRADES, Chain, Prop
@@ -117,6 +119,23 @@ def cmd_check(ctx: Context, a):
     if not found.matched and not notes:
         print("nothing recorded; add the idea with `reader new prop`, then ask")
     warn(m)
+
+
+def cmd_graph(ctx: Context, a):
+    m, terms = ctx.model, terms_of(a.terms)
+    if terms:
+        found = m.lookup(terms, a.depth, None)
+        if not found.matched:
+            die(f"nothing matches {', '.join(terms)}")
+        data = view.graph(m, found.matched + found.rests_on + found.rests_on_it, found.matched)
+    else:
+        data = view.graph(m)
+    out = Path(a.out).expanduser() if a.out else ctx.cfg.cache / "graph.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(view.html(data, "reader · " + (", ".join(terms) or "everything")))
+    print(out)
+    if not a.no_open:
+        webbrowser.open(out.resolve().as_uri())
 
 
 def cmd_find(ctx: Context, a):
@@ -344,6 +363,12 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("terms", nargs="+")
     sp.add_argument("--depth", type=int, default=2, help="levels of premises (default 2)")
     sp.add_argument("--all", action="store_true", help="no limit on matches")
+    sp = add("graph", cmd_graph, "draw the model (or the neighbourhood of some terms) as an "
+             "interactive graph in the browser")
+    sp.add_argument("terms", nargs="*")
+    sp.add_argument("--depth", type=int, default=2, help="levels of premises (default 2)")
+    sp.add_argument("--out", help="where to write the page (default: the cache folder)")
+    sp.add_argument("--no-open", action="store_true", help="write the page, do not open it")
     sp = add("find", cmd_find, "existing propositions and vault notes for some terms")
     sp.add_argument("terms", nargs="+")
     sp.add_argument("--limit", type=int, default=8)

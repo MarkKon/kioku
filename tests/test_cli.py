@@ -101,3 +101,15 @@ def test_check_shows_premises_and_dependents(reader):
 def test_answer_needs_a_block_id(reader):
     r = reader("answer", "1a9", ok=False)
     assert r.returncode != 0
+
+
+def test_graph_writes_a_page_with_the_neighbourhood(reader, tmp_path):
+    out = tmp_path / "g.html"
+    reader("graph", "quadratic", "--out", str(out), "--no-open")
+    page = out.read_text()
+    data = json.loads(page.split("const DATA = ", 1)[1].split(";\n", 1)[0])
+    assert {n["id"] for n in data["nodes"]} == {"p_aaaa", "p_bbbb"}
+    assert [n["id"] for n in data["nodes"] if n["focus"]] == ["p_bbbb"]
+    assert data["links"] == [{"source": "p_aaaa", "target": "p_bbbb", "chain": "c_cccc",
+                              "arrow": True}]
+    assert "ForceGraph" in page
