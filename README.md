@@ -1,23 +1,61 @@
 # reader
 
-A learner model for one reader, Konstantin, used by coding and writing agents
-to pitch explanations at their level.
+A learner model for agents. It records what a reader has shown they know, so
+that coding and writing agents can pitch every explanation at their level:
+one step from what they hold, never re-teaching what they have.
 
-The loop: an agent looks an idea up (`reader check`), asks what the lookup
-does not settle (`reader ask`), and passes the reply on (`reader answer`,
-`reader grade`), which records it at once. Evidence comes only from questions
-asked and answered. A memory model (FSRS-6 for now) turns each id's answers
-into R, the probability they recall it today.
+## The loop
 
-- `src/reader/cli.py`: the CLI. `reader -h` lists the commands.
-- `skills/reader-brief/`: the agent skill. Linked into `~/.agents/skills` by
-  the dotfiles.
-- The model itself lives in `$READER_HOME` (default `~/.local/share/reader`), a
-  separate private git repo.
+1. **Look up.** `reader check girsanov, #sde` shows the matching ideas, what
+   they rest on, and what rests on them, each with R, the probability the
+   reader recalls it today.
+2. **Ask.** When R and the task leave it unsettled, the agent asks a short
+   question block (`reader ask`): multiple choice with a confidence digit, a
+   formula written by hand, or one free line.
+3. **Record.** The reader's one-line reply goes to `reader answer`, which
+   grades it and records the evidence at once.
+
+Evidence comes only from questions asked and answered, never from
+conversation or self-report. A memory model (FSRS-6 for now) turns each idea's
+answers into R. The model is plain files: propositions (checkable claims),
+chains (premises that give a conclusion by a step), and one line per answer.
 
 ## Install
 
-    uv tool install -e .
+    uv tool install git+https://github.com/MarkKon/reader
+    reader init                      # creates ~/.local/share/reader
+    $EDITOR ~/.local/share/reader/profile.md
+
+Then link `skills/reader-brief` into your agent's skills folder (for example
+`~/.claude/skills/reader-brief`), so agents know the loop and the question
+format.
+
+## Configure
+
+Settings come from the environment, or from `config.toml` in the model folder:
+
+| env                  | config.toml   | what                                          |
+| -------------------- | ------------- | --------------------------------------------- |
+| `READER_HOME`        |               | the model folder (default `~/.local/share/reader`) |
+| `READER_VAULT`       | `vault`       | a folder of the reader's markdown notes, shown as hints |
+| `READER_SCOUT_MODEL` | `scout_model` | a [pi](https://github.com/badlogic/pi-mono) model that drafts propositions from notes |
+
+Both the vault and the scout are optional. Run `reader upkeep` daily to lint
+and back up the model (it commits to the model folder's git repo, and pushes
+when it has a remote).
+
+## Code
+
+| module         | what it owns                                              |
+| -------------- | --------------------------------------------------------- |
+| `records.py`   | the records: propositions, chains, answers                |
+| `store.py`     | the model folder and its line formats                     |
+| `memory.py`    | the memory model: answers → R (swap this for a better one) |
+| `model.py`     | the graph in memory: lookups, search, recall per id       |
+| `questions.py` | question blocks: parse, render, grade replies             |
+| `vault.py`     | the optional notes folder, read only                      |
+| `upkeep.py`    | lint, duplicates, calibration, backup, drafting           |
+| `cli.py`       | arguments and printing                                    |
 
 ## Test
 

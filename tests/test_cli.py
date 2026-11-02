@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-CLI = Path(__file__).resolve().parents[1] / "src" / "reader" / "cli.py"
 
 BLOCK = """# test
 1 pick p_aaaa: increments are
@@ -34,7 +33,7 @@ def reader(tmp_path):
            "READER_TODAY": "2026-11-02"}
 
     def run(*args, stdin=None, ok=True):
-        r = subprocess.run([sys.executable, str(CLI), *args], input=stdin,
+        r = subprocess.run([sys.executable, "-m", "reader", *args], input=stdin,
                            capture_output=True, text=True, env=env)
         if ok:
             assert r.returncode == 0, r.stderr

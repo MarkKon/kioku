@@ -1,16 +1,16 @@
 ---
 name: reader-brief
 description:
-  "What Konstantin has shown they know, as recall probabilities, and the one
-  way to ask them. Use whenever an explanation, lesson, essay, paper or step of
+  "What the reader (the person you work with) has shown they know, as recall
+  probabilities, and the one way to ask them. Use whenever an explanation, lesson, essay, paper or step of
   shared work leans on an idea they may not hold: look it up, and ask what the
   lookup does not settle, before pitching it at their level."
 ---
 
 # Reader brief
 
-The reader is Konstantin: maths PhD student, MSc in Technical Mathematics.
-Pitch everything at the **goldilocks** level: each new idea sits one reasoning
+The reader is the person you are working with. `reader profile` says who they
+are and how they like to answer; read it once per session. Pitch everything at the **goldilocks** level: each new idea sits one reasoning
 step from something they hold, and what they hold gets a sentence and a link,
 not a re-derivation. Learn what they hold by looking it up, and ask when the
 lookup does not settle it.
@@ -24,14 +24,14 @@ lookup does not settle it.
 - **Evidence** is an answer they gave to a question you asked, about one
   proposition or one chain. Nothing else counts: what they showed in
   conversation, what you taught, what they say they know and what they wrote in
-  the labvault move no number.
+  their notes move no number.
 - A **memory model** turns each id's answers into **R**, the probability they
   recall it today (FSRS-6 for now). An answer updates only the id it is about.
   A wrong last answer holds R at 0 until a right one. No answers means no R:
   unknown, not zero.
 
-The model lives in `~/.local/share/reader/`. Read and write it only through
-`reader` (`reader -h` lists the commands).
+The model lives in `$READER_HOME` (default `~/.local/share/reader/`). Read and
+write it only through `reader` (`reader -h` lists the commands).
 
 ## The check
 
@@ -43,8 +43,8 @@ may not hold. It is also how every brief is built.
    idea rests on (chains and premises, two levels) and what rests on it. Each
    line has R, the number of answers, the last answer's date and grade, and the
    statement or step. A misconception or "never met it" shown in the last answer
-   is flagged. Vault notes on the terms that have no proposition yet are listed
-   as hints.
+   is flagged. When a vault (a folder of their notes) is configured, notes on
+   the terms that have no proposition yet are listed as hints.
 2. **Decide** from R and the task. How sure you need to be depends on how much
    the next step leans on the idea: a premise the argument runs through needs a
    high, recent R, and a side remark needs none. The premises' R tells you
@@ -56,7 +56,7 @@ may not hold. It is also how every brief is built.
 4. **Pitch** the next step at what they showed. Their answer is already
    recorded.
 
-Most of their MSc mathematics has no evidence yet: that calls for a question,
+Most of what they know has no evidence yet: that calls for a question,
 not an assumption that they lack it.
 
 ## A brief
@@ -85,8 +85,8 @@ in one line. A check, a brief, and a lesson's probe, prediction and check all
 use it. There are three kinds of item:
 
 - **pick**: multiple choice, answered with a letter and a confidence digit
-  (`2b8`: option b, 80% sure). The default, since they usually type little.
-- **write**: they write it on their tablet and compare it with the reference
+  (`2b8`: option b, 80% sure). The default: the quickest to answer.
+- **write**: they write it on paper or a tablet and compare it with the reference
   you then show (`3.` when done, then `3=`, `3~` or `3x`). For formulas and
   short derivations they want in their hands.
 - **say**: one free line, typed or dictated, for a why or a prediction a pick
@@ -149,8 +149,10 @@ question it answered.
 
 ## Upkeep
 
-A daily T3 task runs `reader upkeep --scout`. It lints the model, commits it to
-its git repo, lists likely duplicates, and has a cheap model draft propositions
-for newly developed vault notes into `proposals.md`. When they approve drafts,
+Run `reader upkeep` daily, e.g. as a scheduled task. It lints the model,
+commits it to its git repo (and pushes, when it has a remote), and lists likely
+duplicates. With a vault, it lists finished notes that have no proposition yet;
+with `--scout` and a configured scout model, a cheap model drafts propositions
+for them into `proposals.md`. When they approve drafts,
 check each against its note, add it with `reader new`, and end its `##` header
 with `· added` or `· skipped`.

@@ -1,0 +1,228 @@
+"""Question blocks: the one way to ask, and the only source of evidence.
+
+A block is written in a small text format (see the reader-brief skill), stored
+as a dict (JSON in the store), shown as markdown, and answered in one line.
+Grading a reply turns each answered item into an Answer. Nothing here touches
+files.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import random
+import re
+import string
+from dataclasses import dataclass, field
+
+from .records import Answer
+from .store import ID
+from .text import short
+
+ITEM_RE = re.compile(r"^(\d+)\s+(pick|write|say)\s+(" + ID + r"):\s*(.*)$")
+REPLY_RE = re.compile(r"(?:(?<=[\s,;])|^)(\d{1,2})([a-h][0-9]?|[.=~x?\-])(?=[\s,;:]|$)")
+
+
+def parse_block(text: str) -> tuple[str, list[dict], list[str]]:
+    """Block text → (title, items, problems). Each item is a dict:
+    n, kind, id, q, options [{text, correct, mis}], why, ref."""
+    title, items, problems = "", [], []
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            continue
+        if line.startswith("# ") and not items:
+            title = line[2:].strip()
+            continue
+        m = ITEM_RE.match(line)
+        if m:
+            items.append({"n": int(m[1]), "kind": m[2], "id": m[3], "q": m[4],
+                          "options": [], "why": "", "ref": ""})
+            continue
+        if not items:
+            problems.append(f"before the first item: {line}")
+            continue
+        it, body = items[-1], line.strip()
+        if body[:2] in ("* ", "- "):
+            text_, _, mis = body[2:].partition(" :: ")
+            it["options"].append({"text": text_.strip(), "correct": body[0] == "*",
+                                  "mis": mis.strip()})
+        elif body.startswith("? "):
+            it["why"] = (it["why"] + " " + body[2:]).strip()
+        elif body.startswith("= "):
+            it["ref"] = (it["ref"] + " " + body[2:]).strip()
+        else:
+            it["q"] = (it["q"] + " " + body).strip()
+    for k, it in enumerate(items, 1):
+        if it["n"] != k:
+            problems.append(f"items must be numbered 1, 2, 3, …; got {it['n']} at position {k}")
+        if it["kind"] == "pick":
+            if len(it["options"]) < 2 or sum(o["correct"] for o in it["options"]) != 1:
+                problems.append(f"item {it['n']}: a pick needs ≥ 2 options, exactly one `* `")
+        elif not it["ref"]:
+            problems.append(f"item {it['n']}: a {it['kind']} needs a `= ` reference answer")
+    return title, items, problems
+
+
+def new_block(qid: str, title: str, items: list[dict], now: dt.datetime) -> dict:
+    """A stored block: options shuffled, every item open."""
+    for it in items:
+        random.shuffle(it["options"])
+        it["state"] = "open"
+    return {"id": qid, "title": title, "asked": now.isoformat(timespec="seconds"),
+            "items": items}
+
+
+def render(ask: dict) -> str:
+    """The block as markdown, to show as it is."""
+    items = ask["items"]
+    out = [f"**{ask['title'] or 'Questions'}** · reply on one line", "", f"_{_legend(items)}_"]
+    for it in items:
+        hint = {"pick": "", "write": f" — _on paper or a tablet; reply `{it['n']}.` when done_",
+                "say": " — _one line_"}[it["kind"]]
+        out += ["", f"**{it['n']}** · {it['q']}{hint}"]
+        if it["options"]:
+            out.append("")
+        out += [f"- **{string.ascii_lowercase[k]})** {o['text']}"
+                for k, o in enumerate(it["options"])]
+    out += ["", f"<!-- for the agent: block {ask['id']}; pass the reply on with "
+                f"`reader answer {ask['id']} \"<reply>\"` -->"]
+    return "\n".join(out)
+
+
+@dataclass
+class Graded:
+    shown: list[str] = field(default_factory=list)  # one verdict line per item, for the reader
+    answers: list[Answer] = field(default_factory=list)  # to record
+    to_grade: list[int] = field(default_factory=list)  # say items the agent must grade
+
+
+def grade_reply(ask: dict, reply: str, day: dt.date, now: dt.datetime,
+                redo: bool = False) -> Graded:
+    """Grade a one-line reply. Updates each item's state and replies in `ask`."""
+    g = Graded()
+    entries = parse_reply(reply, len(ask["items"]))
+    for n, tok, thoughts in entries:
+        it = ask["items"][n - 1]
+        if it["state"] == "done" and not redo:
+            g.shown.append(f"- **{n}** already answered (--redo to answer again)")
+            continue
+        it.setdefault("replies", []).append(
+            {"at": now.isoformat(timespec="seconds"), "token": tok, "thoughts": thoughts})
+        shown, answer, done = _grade_item(ask["id"], it, tok, thoughts, day)
+        g.shown.append(f"- **{n}** {shown}")
+        if answer:
+            g.answers.append(answer)
+        if done:
+            it["state"] = "done"
+        elif it["kind"] == "say" and (tok == ":" or thoughts):
+            it["state"], it["answer"] = "to-grade", thoughts
+            g.to_grade.append(n)
+    return g
+
+
+def grade_say(ask: dict, n: int, grade: str, day: dt.date, mis: str | None = None,
+              note: str | None = None) -> Answer:
+    """The agent's grade for an answered item (a say item, or a regrade)."""
+    it = ask["items"][n - 1]
+    it["state"] = "done"
+    text = f"misconception: {mis}" if mis else note or short(it.get("answer", ""), 80) \
+        or "graded by the agent"
+    return Answer(day, it["id"], it["kind"], grade, ask["id"], n,
+                  flag="mis" if mis else None, note=text)
+
+
+def parse_reply(reply: str, n_items: int) -> list[tuple[int, str, str]]:
+    """`1b8 2. 3- 4? 5: free text` → [(item, token, thoughts)], in item order."""
+    found, last = [], 0
+    for m in REPLY_RE.finditer(reply):
+        n = int(m.group(1))
+        if last < n <= n_items:
+            found.append((n, m.group(2), m.start(), m.end()))
+            last = n
+    entries = []
+    for k, (n, tok, _start, end) in enumerate(found):
+        stop = found[k + 1][2] if k + 1 < len(found) else len(reply)
+        rest = reply[end:stop].strip().strip(",;").strip()
+        entries.append((n, tok, rest[1:].strip() if rest.startswith(":") else rest))
+    for m in re.finditer(r"(?:(?<=\s)|^)(\d{1,2}):\s*", reply):  # `3: …` for a say item
+        n = int(m.group(1))
+        if 0 < n <= n_items and all(e[0] != n for e in entries):
+            stop = min([s for (_n, _t, s, _e) in found if s > m.end()] + [len(reply)])
+            entries.append((n, ":", reply[m.end():stop].strip()))
+    return sorted(entries)
+
+
+def _grade_item(qid: str, it: dict, tok: str, thoughts: str,
+                day: dt.date) -> tuple[str, Answer | None, bool]:
+    """One reply token → (verdict to show, answer to record, item done)."""
+    n, kind = it["n"], it["kind"]
+    said = f" · “{short(thoughts, 80)}”" if thoughts else ""
+    right = next((o for o in it["options"] if o["correct"]), {"text": "", "mis": ""})
+
+    def answer(grade, note, conf=None, flag=None):
+        return Answer(day, it["id"], kind, grade, qid, n, conf, flag, note + said)
+
+    if tok == "-":
+        return "never met", answer("again", "never met it", flag="unseen"), True
+    if tok == "?":
+        return ("seen, not producible — it is: " + (it["ref"] or right["text"]),
+                answer("again", "seen it, could not produce it"), True)
+    if kind == "pick":
+        if not re.fullmatch(r"[a-h][0-9]?", tok):
+            return f"wants a letter and a confidence digit, e.g. `{n}b8`", None, False
+        k = ord(tok[0]) - ord("a")
+        if k >= len(it["options"]):
+            return f"has no option {tok[0]}", None, False
+        conf = int(tok[1]) if len(tok) > 1 else 5
+        unsure = "" if len(tok) > 1 else " (no confidence given, read as 5)"
+        chosen = it["options"][k]
+        if chosen["correct"]:
+            grade = "good" if conf >= 8 else "hard" if conf / 10 > 1 / len(it["options"]) else "guess"
+            verdict = {"good": "✓ solid", "hard": "✓ fragile", "guess": "✓ but a guess"}[grade]
+            why = f". {it['why']}" if it["why"] and grade != "good" else ""
+            return (f"{verdict} — {tok[0]} at {conf}0%{unsure}{why}",
+                    answer(grade, f"picked {short(chosen['text'], 50)}", conf), True)
+        mis = conf >= 8
+        letter = string.ascii_lowercase[it["options"].index(right)]
+        if mis:
+            note = (f"misconception: {chosen['mis'] or short(chosen['text'], 50)}; "
+                    f"right: {short(right['text'], 50)}")
+        else:
+            note = f"picked {short(chosen['text'], 50)}, right: {short(right['text'], 50)}"
+        shown = (f"✗ {'misconception' if mis else 'gap'} — {tok[0]} at {conf}0%{unsure}. "
+                 f"Right: **{letter})** {right['text']}"
+                 + (f". _{chosen['mis']}_" if chosen["mis"] and mis else "")
+                 + (f". {it['why']}" if it["why"] else ""))
+        return shown, answer("again", note, conf, "mis" if mis else None), True
+    if kind == "write":
+        if tok == ".":
+            it["state"] = "shown"
+            return (f"compare with: {it['ref']}  \n"
+                    f"  reply `{n}=` matches · `{n}~` small slip · `{n}x` wrong"), None, False
+        if tok in ("=", "~", "x"):
+            grade = {"=": "good", "~": "hard", "x": "again"}[tok]
+            note = {"=": "wrote it correctly", "~": "wrote it with a small slip",
+                    "x": "could not write it"}[tok]
+            return f"{'✗' if tok == 'x' else '✓'} {note}", answer(grade, note), True
+        return f"wants `{n}.` then `{n}=`, `{n}~` or `{n}x`", None, False
+    if tok != ":" and not thoughts:  # say
+        return f"wants `{n}: <answer>`", None, False
+    return f"you said: “{short(thoughts, 100)}”  \n  reference: {it['ref']}", None, False
+
+
+def _legend(items: list[dict]) -> str:
+    """The reply forms this block uses, with its own item numbers."""
+    first: dict[str, int] = {}
+    for it in items:
+        first.setdefault(it["kind"], it["n"])
+    parts = []
+    if "pick" in first:
+        parts.append(f"`{first['pick']}b8` option b, 80% sure")
+    if "write" in first:
+        parts.append(f"`{first['write']}.` done writing")
+    if "say" in first:
+        parts.append(f"`{first['say']}: …` your answer")
+    if "pick" in first or "write" in first:
+        parts += ["`-` never met", "`?` seen it, can't produce it",
+                  "`: …` after any answer for your thoughts"]
+    return " · ".join(parts)

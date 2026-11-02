@@ -13,5 +13,11 @@ decide from those numbers and the task whether to ask.
 - States stay few and simple, and every answer is written the moment it is
   graded.
 
+Nothing in the code or the skill is about one reader: who they are lives in
+their `profile.md`, and their setup in `config.toml`, both in the model folder.
+
+The README's module table says what each module owns; keep it true. The memory
+model is the seam for later work: only `memory.recall` knows how R is computed.
+
 The CLI and `skills/reader-brief/SKILL.md` change together: a command change
 updates the skill in the same commit. Run `uv run pytest` before committing.

@@ -1,7 +1,7 @@
 [project]
 name = "reader"
 version = "0.1.0"
-description = "What Konstantin has shown they know, as recall probabilities"
+description = "A learner model for agents: what a reader has shown they know, as recall probabilities"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
