@@ -46,9 +46,10 @@ light or dark mode, with a toggle.
     reader init                      # creates ~/.local/share/reader
     $EDITOR ~/.local/share/reader/profile.md
 
-Then link `skills/reader-brief` into your agent's skills folder (for example
-`~/.claude/skills/reader-brief`), so agents know the loop and the question
-format.
+Then link the skills into your agent's skills folder (for example
+`~/.claude/skills/`): `skills/reader-brief` teaches agents the loop and the
+question format, and `skills/learn` runs a lesson on it, sweeping the route
+to a goal and checking each step before the next rests on it.
 
 ## Configure
 

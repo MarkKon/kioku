@@ -303,3 +303,6 @@ Newest last. Add an entry whenever a principle is added, changed or dropped.
   whole route with questions before teaching.
 - **2026-11-03.** A proposition records stating and applying, the chain into
   it records deriving.
+- **2026-11-03.** The learn skill moves into the repo beside reader-brief: it
+  runs on the CLI, so it changes with it. The essay, paper and pair skills stay
+  out; they use the model only through reader-brief.
