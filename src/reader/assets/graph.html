@@ -30,6 +30,8 @@
   .bar { position: fixed; top: 12px; left: 12px; display: flex; gap: 10px; align-items: center;
     background: var(--panel); border: 1px solid var(--hair); border-radius: 8px; padding: 6px 10px; }
   .bar button { background: none; border: 0; color: var(--ink-2); font-size: 15px; cursor: pointer; padding: 0 2px; }
+  .bar button:hover { color: var(--ink); }
+  .bar button[hidden] { display: none; }
   .bar input[type=search] { background: transparent; border: 0; outline: 0; color: var(--ink);
     font: inherit; width: 220px; }
   .bar label { color: var(--ink-2); display: flex; gap: 4px; align-items: center; cursor: pointer; }
@@ -71,11 +73,12 @@
   <input type="search" id="q" placeholder="Search…" autocomplete="off">
   <label><input type="checkbox" id="orphans" checked> unconnected</label>
   <span class="count" id="count"></span>
+  <button id="refresh" title="refresh from the model (r)" hidden>↻</button>
   <button id="theme" title="light / dark">◐</button>
 </div>
 <div class="legend">
   <div><div class="ramp" id="ramp"></div><div class="ramp-ends"><span>R 0</span><span>1</span></div></div>
-  <span>recall today</span>
+  <span>recall now</span>
   <span class="dot" style="background:var(--unknown)"></span><span>never asked</span>
   <span class="dot" style="border:2px solid var(--critical)"></span><span>last answer a misconception</span>
   <span class="dot" style="border:2px solid var(--ink)"></span><span>looked up</span>
@@ -86,6 +89,11 @@
 <script>/*{{force-graph}}*/</script>
 <script>
 const DATA = /*{{data}}*/;
+
+// a refresh reloads the page, which the server builds afresh from the model;
+// the layout, view, search and open panel are carried across in sessionStorage
+const KEPT = (() => { try { return JSON.parse(sessionStorage.getItem("reader-kept")); }
+                      catch { return null; } finally { sessionStorage.removeItem("reader-kept"); } })();
 
 // R → one blue ramp, faint to strong against the surface (validated steps:
 // light 250 … 700, dark 600 … 100), so well-held ideas stand out in both modes
@@ -120,7 +128,7 @@ const C = k => T[k.replace(/^--/, "")];
 const colourOf = r => r == null ? T.unknown
   : RAMP[Math.round(Math.max(0, Math.min(1, r)) * (RAMP.length - 1))];
 
-const fmtR = r => r == null ? "–" : r >= 1 ? "1" : r.toFixed(2).replace(/^0/, "");
+const fmtR = r => r == null ? "–" : r >= 1 ? "1" : (Math.floor(r * 100) / 100).toFixed(2).replace(/^0/, "");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const idOf = x => typeof x === "object" ? x.id : x;
 
@@ -185,6 +193,67 @@ G.d3Force("charge").strength(n => n.knot ? -8 : -70);
 G.d3Force("gravity", (() => { let ns = []; const f = alpha => {
   for (const n of ns) { n.vx -= n.x * 0.04 * alpha; n.vy -= n.y * 0.04 * alpha; } };
   f.initialize = nodes => { ns = nodes; }; return f; })());
+// implications flow down the page. Each proposition gets a depth, the longest
+// chain path into it (a premise with no premises of its own sits just above its
+// nearest conclusion), and is pulled gently to that row; each link also nudges
+// its target below its source. All soft, so a cycle stays a tangle instead of
+// breaking the layout.
+const depth = (() => {
+  const d = {}, cs = Object.values(DATA.chains), n = Object.keys(props).length;
+  for (const c of cs) for (const id of [...c.premises, c.conclusion]) d[id] ??= 0;
+  for (let i = 0, moved = true; moved && i < n; i++) {
+    moved = false;
+    for (const c of cs) { const want = 1 + Math.max(...c.premises.map(p => d[p]));
+      if (d[c.conclusion] < want) { d[c.conclusion] = want; moved = true; } }
+  }
+  for (const c of cs) for (const p of c.premises)
+    if (!cs.some(k => k.conclusion === p))
+      d[p] = Math.max(d[p], Math.min(...cs.filter(k => k.premises.includes(p)).map(k => d[k.conclusion])) - 1);
+  for (const [cid, c] of Object.entries(DATA.chains)) d[cid] = d[c.conclusion] - 0.45;
+  return d;
+})();
+// rows are relative to each connected component, so components keep apart
+const comp = {};
+for (const id of Object.keys(depth)) {
+  if (id in comp) continue;
+  const stack = [id]; comp[id] = id;
+  while (stack.length) for (const cid of chainsOf[stack.pop()] ?? [])
+    for (const m of members[cid]) if (!(m in comp)) { comp[m] = id; stack.push(m); }
+}
+const ROW = 42;
+// each component starts in its own place, biggest in the middle, already in
+// row order, and is held together loosely: started tangled, a force layout
+// never pulls components apart again
+const home = (() => {
+  const by = {};
+  for (const [id, c] of Object.entries(comp)) (by[c] ??= []).push(id);
+  const order = Object.values(by).sort((a, b) => b.length - a.length);
+  const at = {};
+  order.forEach((ids, i) => {
+    const a = i * 2.39996, r = 130 * Math.sqrt(i);  // golden-angle spiral
+    const mean = ids.reduce((s, id) => s + depth[id], 0) / ids.length;
+    ids.forEach((id, j) => at[id] = [r * Math.cos(a) + ((j * 37) % 60 - 30),
+                                      r * Math.sin(a) + (depth[id] - mean) * ROW]);
+  });
+  return at;
+})();
+G.d3Force("layers", alpha => {
+  const sum = {};  // per component: mean x, mean y and mean depth of the nodes shown
+  const ns = G.graphData().nodes.filter(n => n.id in depth);
+  for (const n of ns) { const s = sum[comp[n.id]] ??= [0, 0, 0, 0];
+    s[0] += n.x; s[1] += n.y; s[2] += depth[n.id]; s[3]++; }
+  for (const n of ns) { const [x, y, d, k] = sum[comp[n.id]];
+    n.vx += (x / k - n.x) * 0.03 * alpha;
+    n.vy += (y / k + (depth[n.id] - d / k) * ROW - n.y) * 0.12 * alpha; }
+});
+G.d3Force("flow", alpha => {
+  for (const l of G.graphData().links) {
+    const s = l.source, t = l.target;
+    if (typeof s !== "object") continue;  // not yet resolved by the link force
+    const short = (l.arrow ? 34 : 16) - (t.y - s.y);
+    if (short > 0) { const k = short * 0.12 * alpha; t.vy += k; s.vy -= k; }
+  }
+});
 G.d3Force("link").distance(l => l.arrow && idOf(l.source) in DATA.chains ? 30 : l.arrow ? 55 : 22);
 
 function hexA(hex, a) {
@@ -224,15 +293,38 @@ function draw(n, ctx, scale) {
 
 // -- data, with or without unconnected propositions
 const q = document.getElementById("q");
-function load() {
+function load(at = {}) {
   const keep = document.getElementById("orphans").checked;
   const nodes = DATA.nodes.filter(n => keep || n.knot || degree(n.id) > 0);
-  G.graphData({ nodes: nodes.map(n => ({ ...n })), links: DATA.links.map(l => ({ ...l })) });
+  const place = n => at[n.id] ? { ...n, x: at[n.id][0], y: at[n.id][1] }
+    : n.id in home ? { ...n, x: home[n.id][0], y: home[n.id][1] } : { ...n };
+  G.graphData({ nodes: nodes.map(place), links: DATA.links.map(l => ({ ...l })) });
   const np = nodes.filter(n => !n.knot).length, nc = Object.keys(DATA.chains).length;
-  document.getElementById("count").textContent = `${np} propositions · ${nc} chains · ${DATA.today}`;
+  document.getElementById("count").textContent = `${np} propositions · ${nc} chains · ${DATA.now}`;
 }
 document.getElementById("orphans").onchange = () => { G._fitted = false; load(); };
-load();
+if (KEPT) {
+  document.getElementById("orphans").checked = KEPT.orphans;
+  G._fitted = true;  // keep their view rather than zooming to fit
+  load(KEPT.at);
+  G.centerAt(KEPT.centre.x, KEPT.centre.y); G.zoom(KEPT.zoom);
+  G.d3AlphaDecay(0.08);  // already laid out: settle any new nodes without a long drift
+} else load();
+
+const refresh = document.getElementById("refresh");
+refresh.hidden = !DATA.live;
+function reload() {
+  if (!DATA.live) return;
+  const at = {};
+  for (const n of G.graphData().nodes) if (n.x != null) at[n.id] = [n.x, n.y];
+  sessionStorage.setItem("reader-kept", JSON.stringify({ at, centre: G.centerAt(),
+    zoom: G.zoom(), selected, q: q.value, orphans: document.getElementById("orphans").checked }));
+  location.reload();
+}
+refresh.onclick = reload;
+addEventListener("keydown", e => {
+  if (e.key === "r" && !e.metaKey && !e.ctrlKey && !e.altKey && e.target.tagName !== "INPUT") reload();
+});
 
 // -- search lights matches and their chains; Enter centres on the first
 const hay = n => [n.id, n.name, n.statement, ...(n.topics || [])].join(" ").toLowerCase();
@@ -259,7 +351,7 @@ body.onclick = e => { const id = e.target.dataset?.id; if (id) open(id, true); }
 function answers(list) {
   if (!list.length) return `<p style="color:var(--muted)">No answers yet.</p>`;
   return `<ul>${list.slice().reverse().map(a =>
-    `<li><span class="grade">${a.day} ${esc(a.grade)}${a.conf != null ? " · " + a.conf : ""}</span>
+    `<li><span class="grade">${a.at} ${esc(a.grade)}${a.conf != null ? " · " + a.conf : ""}</span>
      ${a.flag === "mis" ? '<span class="mis">misconception</span>' : a.flag === "unseen" ? "never met" : ""}
      <span class="id">${esc(a.kind)} ${esc(a.ask)}</span><br>${esc(a.note)}</li>`).join("")}</ul>`;
 }
@@ -295,9 +387,12 @@ function open(id, centre) {
   }
 }
 
-// a single lookup opens on its match
+// a single lookup opens on its match; a refresh reopens what was open
 const focused = Object.values(props).filter(n => n.focus);
-if (focused.length === 1) setTimeout(() => open(focused[0].id), 50);
+if (KEPT) {
+  if (KEPT.q) { q.value = KEPT.q; q.oninput(); }
+  if (KEPT.selected) setTimeout(() => open(KEPT.selected), 50);
+} else if (focused.length === 1) setTimeout(() => open(focused[0].id), 50);
 addEventListener("resize", () => G.width(innerWidth).height(innerHeight));
 </script>
 </body>

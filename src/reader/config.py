@@ -6,7 +6,8 @@ model folder:
   READER_HOME          the model folder (default ~/.local/share/reader)
   READER_VAULT         vault = "…"        a folder of markdown notes (optional)
   READER_SCOUT_MODEL   scout_model = "…"  a pi model for drafting (optional)
-  READER_TODAY         fixes today's date, for tests
+  READER_TODAY         fixes the clock, for tests: a date (read as noon) or a
+                       date and time, e.g. 2026-11-02T09:30
 """
 
 from __future__ import annotations
@@ -23,8 +24,12 @@ class Config:
     home: Path
     vault: Path | None
     scout_model: str | None
-    today: dt.date
+    now: dt.datetime
     cache: Path
+
+    @property
+    def today(self) -> dt.date:
+        return self.now.date()
 
 
 def load() -> Config:
@@ -34,12 +39,16 @@ def load() -> Config:
     except FileNotFoundError:
         file = {}
     vault = os.environ.get("READER_VAULT") or file.get("vault")
-    today = os.environ.get("READER_TODAY")
+    fixed = os.environ.get("READER_TODAY")
     cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "reader"
     return Config(
         home=home,
         vault=Path(vault).expanduser() if vault else None,
         scout_model=os.environ.get("READER_SCOUT_MODEL") or file.get("scout_model"),
-        today=dt.date.fromisoformat(today) if today else dt.date.today(),
+        now=_moment(fixed) if fixed else dt.datetime.now().replace(microsecond=0),
         cache=cache,
     )
+
+
+def _moment(s: str) -> dt.datetime:
+    return dt.datetime.fromisoformat(s if "T" in s else s + "T12:00")

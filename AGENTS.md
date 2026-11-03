@@ -13,6 +13,9 @@ decide from those numbers and the task whether to ask.
 - States stay few and simple, and every answer is written the moment it is
   graded.
 
+`PHILOSOPHY.md` gives the reason for each rule. A change that bends a principle
+updates it there first and adds a dated line to its decision log.
+
 Nothing in the code or the skill is about one reader: who they are lives in
 their `profile.md`, and their setup in `config.toml`, both in the model folder.
 

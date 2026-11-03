@@ -26,7 +26,8 @@ lookup does not settle it.
   conversation, what you taught, what they say they know and what they wrote in
   their notes move no number.
 - A **memory model** turns each id's answers into **R**, the probability they
-  recall it today (FSRS-6 for now). An answer updates only the id it is about.
+  recall it now (FSRS-6 on elapsed time, so R falls within a day too). An
+  answer updates only the id it is about: nothing propagates through chains.
   A wrong last answer holds R at 0 until a right one. No answers means no R:
   unknown, not zero.
 
@@ -41,7 +42,8 @@ may not hold. It is also how every brief is built.
 1. **Look up**: `reader check <ids or terms>` (comma-separated; `#topic`
    matches a topic). For each matching proposition or chain it shows what the
    idea rests on (chains and premises, two levels) and what rests on it. Each
-   line has R, the number of answers, the last answer's date and grade, and the
+   line has R, the number of answers, the last answer's time (date if not
+   today) and grade, and the
    statement or step. A misconception or "never met it" shown in the last answer
    is flagged. When a vault (a folder of their notes) is configured, notes on
    the terms that have no proposition yet are listed as hints.
@@ -68,8 +70,9 @@ lesson or pair session.
    lists that the piece leans on, read the note, add its propositions, and check
    again.
 2. List the ideas the piece needs. Ask about every one the lookup does not
-   settle in one question block, hardest first: a confident right answer there
-   spares its prerequisites.
+   settle, in blocks, hardest first. A confident right answer at the top tells
+   you where they stand, but it records nothing about the ideas below it: an
+   idea the piece leans on gets its own answer.
 3. Show them the brief. For each idea give its id, R (or none), last date, and
    how the piece treats it: used with a link, recalled in a sentence, or taught.
    Then list their answers. Their correction is final for this piece and goes
@@ -113,16 +116,27 @@ that output as it is.
 confident pick of that option reveals. `?` is the explanation and `=` the
 reference.
 
-- Tag each item with what it tests: a proposition id to recall it, a chain id
-  to derive or apply it.
+- Tag each item with what it tests: a proposition id to state or apply the
+  idea, a chain id to derive it.
+- Each item stands alone: every term in it is defined in the item or was
+  defined earlier in the conversation, in the reader's notation, unless
+  recalling that definition is what the item tests.
 - Options are bare claims of the same length and register. Write the right one
   first, then turn it into each wrong one: the answer someone holding a
-  specific wrong model would give.
+  specific wrong model would give. Every wrong option is false outright, never
+  a weaker form of the right one (if the right one says $=$, $\le$ is not a
+  wrong option).
+- Solve the item yourself, from the definitions as stated, before asking.
 - Prefer an item that applies an idea to one that recites it.
-- At most six items, hardest first; in a lesson, one item per turn.
+- At most six items per block. A lesson's prediction is one item, its check
+  two to four.
 
-Pass their reply on as typed: `reader answer <q_id> "<reply>"`. It grades picks
-and writes, prints a verdict per item, and records each answer at once. Grade
+Pass a reply in the format on as typed: `reader answer <q_id> "<reply>"`. It
+grades picks and writes, prints a verdict per item, and records each answer at
+once. The parser reads input from agents: a reply outside the format ("between
+a and b", a letter without a digit, two letters) is yours to settle first. Ask
+what they meant, or put the reading you would record to them in the format,
+and pass that on. Grade
 each say item against its reference with
 `reader grade <q_id> <n> good|hard|again`, adding
 `--mis "believed X → Y"` for a misconception. Then answer every ✗ in prose: the
@@ -131,6 +145,12 @@ right answer and, for a misconception, why the wrong one tempts.
 Grades: again (wrong or blank), hard (right with effort or a slip), good (right
 and clean), easy (right and carried to a new setting). A right pick at chance
 confidence is a guess, which is recorded but carries no grade.
+
+An answer that does not count (they misread the question, misclicked, or the
+item itself was wrong) is set aside, not edited:
+`reader retract <q_id> <n> --why "<reason>"` moves it to `archive.md` and opens
+the item again, so a corrected reply goes through `reader answer`. To answer a
+finished item again, `reader answer --redo`; the old answer is archived too.
 
 ## Propositions
 
@@ -146,6 +166,21 @@ assumption inside, readable alone. A chain's premises jointly give its
 conclusion; ids or names both work. Topics are kebab-case subjects, reused from
 `reader status`. `reader show <id>` lists every answer for an id with the
 question it answered.
+
+Fix a mistake rather than living with it:
+
+```
+reader amend <id> [--name …] [--statement …] [--topics a,b] [--aliases …] [--vault …]
+reader amend <c_id> [--chain "p_a p_b => p_c"] [--step "…"]
+reader delete <id> [--why "…"]
+```
+
+`amend` keeps the id and its answers, so it is for wording, not for a
+different claim: changing the statement, premises or step of an id that has
+answers needs `--force`. A different claim is a new id; delete the old one.
+`delete` refuses while a chain rests on the id (delete or amend that chain
+first), and refuses an id with answers unless `--force`, which moves the
+answers to `archive.md` rather than dropping them.
 
 ## Upkeep
 

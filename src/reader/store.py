@@ -6,6 +6,7 @@
   chains.md    one chain per line
   evidence.md  one answer per line, the only learner data
   asks/        every question block asked, as JSON, with their replies
+  archive.md   evidence set aside, e.g. of deleted ids; nothing reads it
 
 Only this module knows the line formats.
 """
@@ -33,15 +34,18 @@ HEADERS = {
     "<!-- - c_id · p_a ∧ p_b ⟹ p_c · step: <the reasoning step> -->\n\n",
     "evidence.md": "# Evidence\n\n"
     "<!-- One line per answered item, written by `reader answer` and `reader grade`:\n"
-    "     - YYYY-MM-DD <id> pick|write|say <grade> [confidence] [mis|unseen] q_<ask>/<n>"
+    "     - YYYY-MM-DDTHH:MM <id> pick|write|say <grade> [confidence] [mis|unseen] q_<ask>/<n>"
     " — <what they answered> -->\n\n",
     "profile.md": "# Reader profile\n\n"
     "<!-- Who the reader is, for agents pitching explanations at their level. -->\n\n"
     "Name:\n\nBackground:\n\nHow they answer:\n",
 }
 
+ARCHIVE_HEADER = ("# Archive\n\nNot evidence: lines set aside, e.g. the answers of deleted ids. "
+                  "Nothing reads this file.\n")
+
 ANSWER_RE = re.compile(
-    r"^- (?P<day>\d{4}-\d{2}-\d{2}) (?P<id>" + ID + r") (?P<kind>pick|write|say)"
+    r"^- (?P<day>\d{4}-\d{2}-\d{2})(?:T(?P<time>\d{2}:\d{2}))? (?P<id>" + ID + r") (?P<kind>pick|write|say)"
     r" (?P<grade>again|hard|good|easy|guess)"
     r"(?: (?P<conf>[0-9]))?"
     r"(?: (?P<flag>mis|unseen))?"
@@ -88,29 +92,63 @@ class Store:
                 (self.home / name).write_text(header)
 
     def add_prop(self, p: Prop) -> None:
-        line = f"- {p.id}{SEP}{p.name}{SEP}{p.statement}"
-        if p.topics:
-            line += f"{SEP}topics: {', '.join(p.topics)}"
-        if p.vault:
-            line += f"{SEP}vault: {p.vault}"
-        if p.aliases:
-            line += f"{SEP}aliases: {', '.join(p.aliases)}"
-        self._append("props.md", line)
+        self._append("props.md", format_prop(p))
 
     def add_chain(self, c: Chain) -> None:
-        self._append("chains.md", f"- {c.id}{SEP}{' ∧ '.join(c.premises)} ⟹ {c.conclusion}"
-                                  f"{SEP}step: {c.step}")
+        self._append("chains.md", format_chain(c))
+
+    def replace(self, r: Prop | Chain) -> None:
+        """Rewrite the line of an existing proposition or chain in place."""
+        name, line = (("props.md", format_prop(r)) if isinstance(r, Prop)
+                      else ("chains.md", format_chain(r)))
+        if not self._rewrite(name, lambda x: line if _line_id(x) == r.id else x):
+            raise KeyError(r.id)
+
+    def remove(self, iid: str, day: dt.date, why: str) -> list[str]:
+        """Delete a proposition or chain; move its evidence to archive.md.
+
+        Returns the evidence lines moved. Evidence is set aside, never rewritten,
+        so a deleted id's history stays auditable.
+        """
+        name = "props.md" if iid.startswith("p_") else "chains.md"
+        if not self._rewrite(name, lambda x: None if _line_id(x) == iid else x):
+            raise KeyError(iid)
+        moved: list[str] = []
+
+        def take(x: str) -> str | None:
+            m = ANSWER_RE.match(x)
+            if m and m["id"] == iid:
+                moved.append(x)
+                return None
+            return x
+
+        self._rewrite("evidence.md", take)
+        if moved:
+            self._archive(f"{day} · deleted {iid}", why, moved)
+        return moved
 
     def record(self, a: Answer) -> None:
-        """Write an answer now, replacing any earlier answer to the same item."""
-        self.init()
-        p = self.home / "evidence.md"
-        lines = p.read_text().splitlines()
-        kept = [x for x in lines if not ((m := ANSWER_RE.match(x)) and
-                                         (m["ask"], int(m["n"])) == (a.ask, a.n))]
-        if len(kept) != len(lines):
-            p.write_text("\n".join(kept) + "\n")
+        """Write an answer now. An earlier answer to the same item (a redo or a
+        regrade) moves to archive.md."""
+        self.take_answer(a.ask, a.n, a.day, "replaced by a new answer to the same item")
         self._append("evidence.md", format_answer(a))
+
+    def take_answer(self, ask: str, n: int, day: dt.date, why: str) -> list[str]:
+        """Move the evidence of one question item to archive.md; returns the lines
+        moved. Evidence is set aside, never rewritten."""
+        moved: list[str] = []
+
+        def take(x: str) -> str | None:
+            m = ANSWER_RE.match(x)
+            if m and (m["ask"], int(m["n"])) == (ask, n):
+                moved.append(x)
+                return None
+            return x
+
+        self._rewrite("evidence.md", take)
+        if moved:
+            self._archive(f"{day} · {ask}/{n}", why, moved)
+        return moved
 
     def save_ask(self, ask: dict) -> None:
         self.init()
@@ -119,9 +157,28 @@ class Store:
 
     # -- internals
 
+    def _archive(self, head: str, why: str, lines: list[str]) -> None:
+        if not (self.home / "archive.md").exists():
+            (self.home / "archive.md").write_text(ARCHIVE_HEADER)
+        note = " ".join(why.split())
+        self._append("archive.md", f"\n## {head}" + (f" · {note}" if note else "") +
+                     "\n" + "\n".join(lines))
+
     def _lines(self, name: str) -> list[str]:
         p = self.home / name
         return p.read_text().splitlines() if p.exists() else []
+
+    def _rewrite(self, name: str, f) -> bool:
+        """Map every line of a file through f (None drops it); True if any changed."""
+        p = self.home / name
+        if not p.exists():
+            return False
+        lines = p.read_text().splitlines()
+        new = [y for x in lines if (y := f(x)) is not None]
+        if new == lines:
+            return False
+        p.write_text("\n".join(new) + "\n")
+        return True
 
     def _append(self, name: str, line: str) -> None:
         self.init()
@@ -175,13 +232,33 @@ class Store:
                 continue
             a = parse_answer(line)
             if a is None:
-                problems.append(f"evidence.md:{n}: want `- YYYY-MM-DD <id> <kind> <grade> "
+                problems.append(f"evidence.md:{n}: want `- YYYY-MM-DDTHH:MM <id> <kind> <grade> "
                                 f"[conf] [mis|unseen] q_<ask>/<n> — note`")
             elif a.grade == "guess" and a.kind != "pick":
                 problems.append(f"evidence.md:{n}: only a pick can be a guess")
             else:
                 answers.append(a)
         return answers
+
+
+def _line_id(line: str) -> str | None:
+    m = re.match(r"- (" + ID + r")" + re.escape(SEP), line)
+    return m.group(1) if m else None
+
+
+def format_prop(p: Prop) -> str:
+    line = f"- {p.id}{SEP}{p.name}{SEP}{p.statement}"
+    if p.topics:
+        line += f"{SEP}topics: {', '.join(p.topics)}"
+    if p.vault:
+        line += f"{SEP}vault: {p.vault}"
+    if p.aliases:
+        line += f"{SEP}aliases: {', '.join(p.aliases)}"
+    return line
+
+
+def format_chain(c: Chain) -> str:
+    return f"- {c.id}{SEP}{' ∧ '.join(c.premises)} ⟹ {c.conclusion}{SEP}step: {c.step}"
 
 
 def parse_chain(body: str, names: bool = False) -> tuple[list[str], str] | None:
@@ -200,14 +277,15 @@ def parse_answer(line: str) -> Answer | None:
     m = ANSWER_RE.match(line)
     if not m:
         return None
-    return Answer(day=dt.date.fromisoformat(m["day"]), id=m["id"], kind=m["kind"],
+    at = dt.datetime.fromisoformat(f"{m['day']}T{m['time'] or '12:00'}")
+    return Answer(at=at, id=m["id"], kind=m["kind"],
                   grade=m["grade"], ask=m["ask"], n=int(m["n"]),
                   conf=int(m["conf"]) if m["conf"] else None, flag=m["flag"],
                   note=m["note"] or "")
 
 
 def format_answer(a: Answer) -> str:
-    parts = [a.day.isoformat(), a.id, a.kind, a.grade]
+    parts = [f"{a.at:%Y-%m-%dT%H:%M}", a.id, a.kind, a.grade]
     if a.conf is not None:
         parts.append(str(a.conf))
     if a.flag:

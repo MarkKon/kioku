@@ -96,8 +96,7 @@ class Graded:
     to_grade: list[int] = field(default_factory=list)  # say items the agent must grade
 
 
-def grade_reply(ask: dict, reply: str, day: dt.date, now: dt.datetime,
-                redo: bool = False) -> Graded:
+def grade_reply(ask: dict, reply: str, now: dt.datetime, redo: bool = False) -> Graded:
     """Grade a one-line reply. Updates each item's state and replies in `ask`."""
     g = Graded()
     entries = parse_reply(reply, len(ask["items"]))
@@ -108,7 +107,7 @@ def grade_reply(ask: dict, reply: str, day: dt.date, now: dt.datetime,
             continue
         it.setdefault("replies", []).append(
             {"at": now.isoformat(timespec="seconds"), "token": tok, "thoughts": thoughts})
-        shown, answer, done = _grade_item(ask["id"], it, tok, thoughts, day)
+        shown, answer, done = _grade_item(ask["id"], it, tok, thoughts, now)
         g.shown.append(f"- **{n}** {shown}")
         if answer:
             g.answers.append(answer)
@@ -120,14 +119,14 @@ def grade_reply(ask: dict, reply: str, day: dt.date, now: dt.datetime,
     return g
 
 
-def grade_say(ask: dict, n: int, grade: str, day: dt.date, mis: str | None = None,
+def grade_say(ask: dict, n: int, grade: str, now: dt.datetime, mis: str | None = None,
               note: str | None = None) -> Answer:
     """The agent's grade for an answered item (a say item, or a regrade)."""
     it = ask["items"][n - 1]
     it["state"] = "done"
     text = f"misconception: {mis}" if mis else note or short(it.get("answer", ""), 80) \
         or "graded by the agent"
-    return Answer(day, it["id"], it["kind"], grade, ask["id"], n,
+    return Answer(now, it["id"], it["kind"], grade, ask["id"], n,
                   flag="mis" if mis else None, note=text)
 
 
@@ -153,14 +152,14 @@ def parse_reply(reply: str, n_items: int) -> list[tuple[int, str, str]]:
 
 
 def _grade_item(qid: str, it: dict, tok: str, thoughts: str,
-                day: dt.date) -> tuple[str, Answer | None, bool]:
+                now: dt.datetime) -> tuple[str, Answer | None, bool]:
     """One reply token → (verdict to show, answer to record, item done)."""
     n, kind = it["n"], it["kind"]
     said = f" · “{short(thoughts, 80)}”" if thoughts else ""
     right = next((o for o in it["options"] if o["correct"]), {"text": "", "mis": ""})
 
     def answer(grade, note, conf=None, flag=None):
-        return Answer(day, it["id"], kind, grade, qid, n, conf, flag, note + said)
+        return Answer(now, it["id"], kind, grade, qid, n, conf, flag, note + said)
 
     if tok == "-":
         return "never met", answer("again", "never met it", flag="unseen"), True

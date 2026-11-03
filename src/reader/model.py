@@ -1,4 +1,4 @@
-"""The model in memory: propositions, chains, and each id's recall today."""
+"""The model in memory: propositions, chains, and each id's recall now."""
 
 from __future__ import annotations
 
@@ -21,12 +21,13 @@ class Lookup:
 
 
 class Model:
-    def __init__(self, snap: Snapshot, today: dt.date):
+    def __init__(self, snap: Snapshot, now: dt.datetime):
         self.props: dict[str, Prop] = snap.props
         self.chains: dict[str, Chain] = snap.chains
         self.answers: list[Answer] = snap.answers
         self.problems: list[str] = snap.problems
-        self.today = today
+        self.now = now
+        self.today = now.date()
         self._by_id: dict[str, list[Answer]] = {}
         for a in self.answers:
             self._by_id.setdefault(a.id, []).append(a)
@@ -54,7 +55,7 @@ class Model:
 
     def recall(self, iid: str) -> memory.Recall:
         if iid not in self._recall:
-            self._recall[iid] = memory.recall(self.answers_for(iid), self.today)
+            self._recall[iid] = memory.recall(self.answers_for(iid), self.now)
         return self._recall[iid]
 
     # -- search
