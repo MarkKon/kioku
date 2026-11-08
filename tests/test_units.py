@@ -61,12 +61,15 @@ def test_evidence_lines_carry_the_time_and_old_ones_read_as_noon():
     line = format_answer(a)
     assert line.startswith("- 2026-11-03T09:41 p_aaaa pick good ")
     assert parse_answer(line) == a
+    deep = Answer(a.at, "i_x1y2", "observed", "hard", "q_test", 2, depth="use", note="n")
+    assert format_answer(deep) == "- 2026-11-03T09:41 i_x1y2 observed hard use q_test/2 — n"
+    assert parse_answer(format_answer(deep)) == deep
     old = parse_answer("- 2026-11-02 p_aaaa pick good 8 q_test/1 — picked x")
     assert old.at == dt.datetime(2026, 11, 2, 12, 0)
 
 
 BLOCK = """# t
-1 pick p_aaaa: q
+1 pick p_aaaa transfer: q
   * right
   - wrong :: a wrong model
 2 say c_cccc: why
@@ -83,6 +86,11 @@ def block():
     return {"id": "q_test", "title": title, "asked": "", "items": items}
 
 
+def test_items_name_their_idea_and_depth():
+    _, items, _ = questions.parse_block(BLOCK)
+    assert [(it["id"], it["depth"]) for it in items] == [("p_aaaa", "transfer"), ("c_cccc", "use")]
+
+
 def test_parse_block_reports_problems():
     _, _, problems = questions.parse_block("1 pick p_aaaa: q\n  - only wrong\n")
     assert any("exactly one" in p for p in problems)
@@ -91,7 +99,8 @@ def test_parse_block_reports_problems():
 def test_confident_wrong_pick_is_a_misconception():
     g = questions.grade_reply(block(), "1b9", NOW)
     (a,) = g.answers
-    assert (a.grade, a.conf, a.flag) == ("again", 9, "mis") and "a wrong model" in a.note
+    assert (a.grade, a.conf, a.flag, a.depth) == ("again", 9, "mis", "transfer")
+    assert "a wrong model" in a.note
 
 
 def test_say_items_wait_for_the_agent():
@@ -106,14 +115,29 @@ def test_parse_reply_reads_thoughts():
     assert questions.parse_reply("1b8: hmm 2?", 2) == [(1, "b8", "hmm"), (2, "?", "")]
 
 
-def test_a_chain_with_two_premises_forks_through_a_knot():
-    from reader import view
+def test_idea_blocks_round_trip():
+    from reader.store import format_area, parse_area
+    from reader.records import Idea
+    ideas = [Idea("p_a1b2", "banach", "result", "maths/analysis", "a contraction has one fixed "
+                  "point", ("contraction",), (), ("Banach fixed point",), "0ezz"),
+             Idea("i_c3d4", "banach-proof", "proof", "maths/analysis", "iterate; Cauchy",
+                  ("banach",), ("geometric-series",))]
+    problems: list[str] = []
+    assert parse_area(format_area("maths/analysis", ideas), "maths/analysis", "f",
+                      problems) == ideas
+    assert problems == []
+
+
+def test_edges_and_cycles():
     from reader.model import Model
-    from reader.records import Chain, Prop
+    from reader.records import Idea
     from reader.store import Snapshot
-    props = {i: Prop(i, i, "s") for i in ("p_a", "p_b", "p_c", "p_d")}
-    chains = {"c_x": Chain("c_x", ("p_a", "p_b"), "p_c", "step")}
-    g = view.graph(Model(Snapshot(props, chains, [], []), NOW))
-    assert {n["id"] for n in g["nodes"] if n.get("knot")} == {"c_x"}
-    assert sorted((l["source"], l["target"], l["arrow"]) for l in g["links"]) == [
-        ("c_x", "p_c", True), ("p_a", "c_x", False), ("p_b", "c_x", False)]
+    ideas = {i.id: i for i in (
+        Idea("i_a", "a", "definition", "x", "s"),
+        Idea("i_b", "b", "result", "x", "s", needs=("a",)),
+        Idea("i_c", "c", "proof", "x/y", "s", needs=("b",), uses=("a",)))}
+    m = Model(Snapshot(ideas, set(), []), NOW)
+    assert m.needed_by["i_a"] == ["i_b"] and m.used_by["i_a"] == ["i_c"]
+    assert m.cycles() == [] and m.cycle_through("i_a", ["i_c"]) == ["i_a", "i_c", "i_a"]
+    assert m.areas == {"x", "x/y"} and m.children("x") == ["x/y"]
+    assert m.resolve("b") == "i_b" and m.in_area("x", deep=True) == ["i_a", "i_b", "i_c"]

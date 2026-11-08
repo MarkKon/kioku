@@ -9,6 +9,10 @@ for each, the ideas it borrows from, and the questions it has not answered yet.
 The README says what reader does. This file says why it does it that way. When
 a change bends one of the principles, update this file first.
 
+This file describes the v1 model (ideas, areas, edges marked needs and uses),
+agreed on 2026-11-08; `GLOSSARY.md` defines its words and maps v0's
+(propositions, chains, topics) to them.
+
 ## The problem
 
 When you work with an agent, the agent gives you an explanation at whatever
@@ -52,11 +56,11 @@ quick question, and not only when you ask to learn something.
 ## The core loop
 
 ```
-propositions ──chains──▶ propositions
+areas (a tree) ⊃ ideas ──needs / uses──▶ ideas
         │
-   evidence: answers to questions that were asked
+   evidence: answers to questions that were asked, and verified work
         │
-   memory model (FSRS-6 for now, swappable)  →  R per id
+   memory model (FSRS-6 for now, swappable)  →  R per idea
         │
    agent: the idea + its neighbours + their R + the task  →  ask, or go on
         │
@@ -73,6 +77,167 @@ Everything else is built from checks. A brief for an essay or paper, the probe
 and checks in a lesson, the pause in a pair-programming session, and the
 one-line rule in an agent's global instructions are all checks run on different
 sets of ideas.
+
+## The model, and why
+
+The model has to stay simple enough that any agent can add to it correctly in
+passing, and still say something useful when it holds thousands of ideas.
+Three records do that: ideas, the edges between them, and the areas they live
+in. Evidence attaches to ideas.
+
+### An idea is one thing that can be known alone
+
+An idea is the unit evidence is about. An agent decides what one idea is with
+four tests:
+
+1. **It has a name**: the few words a colleague would use ("Itô isometry",
+   "register_buffer", "Banach fixed point"), with no "and" in it. The name is
+   the idea's identity. Its statement is a reference that can be reworded, as
+   long as a past right answer would still be right.
+2. **It can be known alone.** If someone could plausibly hold one part and lack
+   the other, the parts are two ideas. If not, they are one. When a named
+   theorem bundles parts that can be known apart (Banach: a unique fixed point,
+   and the a priori estimate), the name goes to its main claim and each other
+   part gets a name of its own. **When it is unclear, keep the idea whole**:
+   answers show when parts come apart (the reader keeps getting one part and
+   missing the other), and that is when a part gets its own idea. The whole
+   keeps its answers and needs the new part.
+3. **One short question can check it**, and a right answer is good evidence for
+   the whole of it.
+4. **It does not contain other ideas.** A result does not restate the
+   definitions it uses; it has an edge to them. (A question still defines its
+   terms inline: the question has to stand alone, the record does not.)
+
+Each idea is one of four **kinds**: a *definition* (what a term means), a
+*result* (that something holds: a theorem, a property, how an API behaves), a
+*proof* (why a result holds: a proof, a derivation, or an argument for a
+design choice), or a *method* (how to do something: an algorithm, a technique,
+a code pattern). The kind says what a good question about it looks like.
+
+Ideas are added when a task leans on them: when an agent is about to ask about
+one, or to build on it, and finds nothing. A term a statement merely uses
+("complete metric space") does not get an idea in advance. An agent looking
+up the model before adding is what keeps it consistent: two agents asked to
+cut the same material into ideas from scratch disagreed far more than two
+agents choosing from areas that already existed.
+
+Why:
+
+- **v0 had no rule, and items grew.** Propositions had a median of 254
+  characters. `causal-attention-head` held projections, scaling, mask, softmax
+  and output; a lesson's theorem was rewritten three times before the reader
+  cut it to "two facts". One grade then stood for several claims, and a right
+  answer on the whole hid a wrong one on a part.
+- **The size of a unit is set by what is learned and forgotten together.**
+  This is the knowledge component of Koedinger, Corbett and Perfetti's KLI
+  framework: a unit is inferred from performance on a family of tasks, and when
+  those tasks stop moving together, the unit is split. Test 2 is that rule for
+  an agent that has only one reader's answers.
+- **Wording is not identity.** In v0 the statement was the identity, so an
+  answered idea could not be reworded, and agents amended four ideas straight
+  after creating them. A name is what an agent searches for and what a person
+  says; it is the stable part.
+- **A proof is its own idea** because stating a result and knowing why it
+  holds are known apart ("remembering is not proving"). A result with two proofs
+  has two proof ideas. This replaces v0's chains, which covered the same ground
+  with hyperedges that also carried composition and teaching order.
+
+### Edges are marked needs, uses, or both
+
+An edge from X to Y carries one or both of two marks:
+
+- **needs**: the reader cannot follow X's statement without holding Y. A
+  result needs the definitions its statement uses; a proof needs the result it
+  proves.
+- **uses**: answering a question on X, or doing X, makes the reader carry Y
+  out. A proof uses the lemmas it applies; training a model uses
+  `optimizer.zero_grad()`.
+
+The two marks are independent. Girsanov's theorem needs the definition of
+Brownian motion but does not use it: applying the theorem does not make anyone
+recall the definition. The proof of Girsanov's theorem needs and uses Itô's
+formula. Training a model uses `zero_grad()`, but what a training loop is can be
+followed without knowing that call, so it does not need it. Edges point one
+way and never form a cycle.
+
+For every edge the agent asks both questions, separately, and writes the edge
+once with whichever marks pass. As a default, definitions and results only
+need; proofs and methods use what they carry out, and often need it too (a
+transformer block needs and uses layer normalisation). A result that seems to
+use something usually means its proof is missing: the use belongs on the proof
+idea. Only the closest edge is written: if X needs Y and Y needs Z, X gets no
+edge to Z for that reason, which keeps notation such as $W$ from tying every
+stochastic idea to Brownian motion.
+
+Why:
+
+- **An idea can be information or a tool.** Sometimes Y is needed only to
+  understand what is going on, and sometimes it is used. Making the agent mark
+  which, at the moment it adds the edge, makes the difference explicit for
+  every agent that reads it.
+- **The two behave differently in memory.** Math Academy keeps a prerequisite
+  graph and a separate "encompassing" graph: doing an advanced topic counts as
+  practice of what it encompasses, but not of every prerequisite, because
+  "prerequisites are not necessarily activated" (Skycak 2023). He names mixing
+  the two graphs as the way credit goes wrong.
+- **v0's chains meant three things at once**: a step of a proof, the parts of
+  a whole, and the order a lesson taught things in. 36 of 83 chains had a
+  single premise and 52 were never asked. Needs and uses each have one test;
+  teaching order is not a relation and lives in the lesson.
+- **No OR.** Knowledge space theory can give an idea alternative sets of
+  prerequisites (a surmise system), and v0 could, by several chains into one
+  conclusion. In practice that only meant alternative proofs, which are now
+  separate proof ideas.
+
+### Areas are a tree for finding and for coverage
+
+Every idea has exactly one home **area**, a path in a tree:
+`maths/probability/stochastic-calculus`, `tools/pytorch`. The home is the most
+specific existing area where a colleague would look for the idea first. A new
+area is made only when several ideas will live in it, and the top levels are
+few and change rarely. Areas hold no evidence and are not prerequisites. They
+do three things:
+
+- **They are the index.** At scale an agent does not search the whole model;
+  it opens the area the conversation is in and sees its ideas with R, and its
+  sub-areas folded with counts, the way it would list a directory.
+- **They give coverage**: how many ideas an area has, how many have answers,
+  and when it was last asked. Coverage is what makes "the reader knows this
+  area" a statement with a denominator. In v0 a topic showed "mean R 0.88" when
+  one of its eleven ideas had evidence.
+- **They separate kinds of knowledge without a separate system.** Knowing
+  `register_buffer` and knowing why attention is masked differ by where they
+  live (`tools/pytorch` against `ml/transformers`). An idea in a tool area is
+  cheap to name in passing; an idea in a concept area is not. A pairing skill
+  reads that from the model rather than keeping its own.
+
+### A lookup either finds the idea or says how sure it is that none exists
+
+An agent looks ideas up by name first, then by alias, then by text. Adding an
+idea refuses a near-duplicate and shows it, because a model with clean names
+is the only kind in which a miss means something. A miss says where it looked
+and how well covered that area is: "no idea named novikov; nearest is
+girsanov; stochastic-calculus has 31 ideas, 24 with answers." In v0 a missed
+search produced a duplicate of Picard–Lindelöf, and an empty result could not
+tell "not recorded" from "not found".
+
+### Depth belongs to the question, not to the idea
+
+An idea can be known at different depths: the reader can state it, use it
+when it is named, or transfer it to a setting where nothing points to it.
+Each answer records the depth its question demanded. An idea does not get a
+separate R per depth.
+
+Why:
+
+- **Four Rs per idea would need four times the questions**, and agents could
+  not keep the levels apart. Most of the ladder already has a home: knowing a
+  definition is the definition idea, deriving a result is its proof idea, and
+  doing something fluently shows in the grade and in how stable the memory is.
+- **Transfer is what is left, and it is rarely needed.** It is asked only when
+  a task needs it, and the depth on the answer records that it was.
+- **Recording depth costs one field** and keeps the data a later memory model
+  will want.
 
 ## Principles, and why
 
@@ -127,10 +292,10 @@ The agent combines R, the R of the neighbouring ideas, and the task to decide
 whether to ask. If a premise's R is high, the reader could probably rebuild a
 conclusion they've forgotten.
 
-### 4. An answer updates only the id it is about
+### 4. An answer updates only the idea it is about
 
-A correct answer about a chain does not raise its premises. Each piece of
-evidence stays attached to the thing that was actually asked. Spreading it
+A correct answer about a proof does not raise the lemmas it uses. Each piece of
+evidence stays attached to the idea that was actually asked. Spreading it
 through the graph would be inference. Inference belongs in the memory model,
 where it can be swapped out and re-run, not baked into the evidence.
 
@@ -154,6 +319,12 @@ learned long ago and its R has dropped, so the agent asks, and that answer is
 the review. Ideas come back when they matter, at the moment they are needed.
 A session spent reviewing neglected ideas is still possible, but it is
 something the reader chooses, not a queue that runs their day.
+
+The model exists to estimate what the reader knows, not to make them keep it.
+Forgetting is expected and fine: an idea that has not mattered for a year may
+well be gone, and the model should say so, not push it back into memory. The
+graph is built so that knowing and not knowing are easy to estimate, not so
+that everything in it is retained.
 
 ### 7. Being shown the answer is teaching, not evidence
 
@@ -201,13 +372,26 @@ work for anyone. The learner record stays private.
 
 ### 11. Infrastructure grows from use
 
-Flat files read in full on each run are fine at fifty propositions. The schema
-is the bigger risk: how fine-grained a proposition should be, what a chain
-means, how evidence should spread. Those questions get answered by using the
-loop in real sessions, not by designing a database up front. A database becomes
-worth having when one of these happens: deduplication starts to hurt, the model
-passes a few hundred propositions, or the graph view needs queries the CLI can't
-answer.
+Flat files read in full on each run were fine at fifty propositions. The schema
+was the bigger risk: how fine-grained an idea should be, what an edge means,
+how evidence should spread. v0 answered the first two by being used: about two
+hundred answers over ten days showed items growing without a rule and chains
+carrying three meanings, which is where the v1 model comes from. Storage still
+grows from use. A database becomes worth having when one of these happens:
+deduplication starts to hurt, the model passes a few thousand ideas, or the
+graph view needs queries the CLI can't answer.
+
+### 12. Record the structure now, model it later
+
+The memory model today reads only an idea's own answers. It does not need the
+edges, the areas or the depth of each answer. They are recorded anyway, because
+they are cheap to write when an idea is added, while the agent has its
+statement in front of it, and impossible to recover afterwards. Once there are
+enough answers, a model can be fitted on everything at once: credit along uses
+edges, what needs edges say about ideas never asked, how depth changes
+forgetting. Such a model is judged by how well it predicts answers held out
+from the log (as ALEKS validates its assessments), not by how plausible its
+rules sound. Until one does better, R comes from the idea's own answers.
 
 ## Ideas it draws on
 
@@ -223,7 +407,10 @@ makes.
 | Start from what the learner knows | Ausubel (1968) | the whole premise: look up before you pitch |
 | Spaced repetition, forgetting curves | Ebbinghaus (1885); [FSRS](https://github.com/open-spaced-repetition) | R comes from FSRS-6, used as information rather than as a schedule |
 | Learner models, knowledge tracing | Corbett & Anderson, "Knowledge tracing" (1994) | a learner model, but kept outside any one tutor and shared by every agent |
-| Prerequisite structure | Doignon & Falmagne, knowledge space theory (1985) | chains: premises that together give a conclusion |
+| Prerequisite structure | Doignon & Falmagne, knowledge space theory (1985); surmise systems in Falmagne & Doignon, *Learning Spaces* (2011) | needs edges; alternative prerequisite sets are left out, since in practice they were alternative proofs |
+| Knowledge components | Koedinger, Corbett & Perfetti, "The Knowledge-Learning-Instruction framework", *Cognitive Science* 36(5) (2012) | an idea is sized by what is learned and forgotten together; split it when its parts move apart |
+| Prerequisite vs encompassing graphs | Skycak, "Optimized, individualized spaced repetition in hierarchical knowledge structures" (2023), Math Academy | the needs and uses marks, kept apart because only use is practice |
+| Validating an assessment by prediction | Cosyn et al., "Assessing mathematical knowledge in a learning space" (2013), ALEKS | a later memory model is judged by how well it predicts held-out answers |
 | The testing effect | Roediger & Karpicke, *Psychological Science* 17(3) (2006) | every check also strengthens what it measures |
 | Confidence-based marking | Gardner-Medwin (1995) | the confidence digit on picks |
 | Hypercorrection | Butterfield & Metcalfe (2001) | a confident miss is flagged and repaired first |
@@ -259,13 +446,19 @@ log below.
   eight hours later. Whether early learning needs a separate short-term memory
   model, one in which an idea met this morning can be gone by the evening, is
   open.
-- **Propagation.** Should a right answer on a chain say something about its
-  premises, or a held conclusion about what rests on it? Principle 4 says not in
-  the evidence. Whether the memory model should infer it is open.
-- **What is a proposition, and what is a chain?** Partly settled: a
-  proposition's answers say whether the reader can state and apply a claim,
-  and the chain into it whether they can derive it. How fine-grained a claim
-  should be is still open, and affects every lookup and every question.
+- **What the graph should do to R.** Principle 12 records needs, uses, areas
+  and depth for a later model. Which of them improve the prediction of answers,
+  and by how much, is open until there is enough data to test.
+- **Learning is not retention.** Only 14 of the 129 ideas answered in v0 were
+  answered on more than one day, so R mostly reports how a lesson went that
+  day, and a lesson's close reads .93 to .99 for ideas met that morning. An
+  answer given on the day an idea was taught shows understanding, not memory.
+  How the model should tell the two apart, and how a lesson should add new
+  ideas rather than treat them like old ones, is the next question after v1.
+- **Do agents mark edges consistently?** The needs and uses tests and the four
+  tests for an idea are meant to give the same answer whichever agent applies
+  them. If they do not, the rules need sharpening before the data is worth
+  modelling.
 - **Competent use outside pairing.** Test-verified pairing work counts
   (principle 1). Correct code written elsewhere, with no test and no recorded
   step, still does not; whether it should is open.
@@ -323,3 +516,36 @@ Newest last. Add an entry whenever a principle is added, changed or dropped.
   slip; again: handed the answer). Pairing exercises more ideas than questions
   can cover, and work a test checks is not the ambiguous conversation principle
   1 excludes. Recorded as say-item blocks until the CLI gets a command for it.
+- **2026-11-08.** v1 model. Propositions become **ideas**: named, sized by four
+  tests (a name, can be known alone, one question checks it, contains no other
+  idea), of four kinds (definition, result, proof, method); the name is the
+  identity and the statement can be reworded. Chains are dropped: a proof is
+  its own idea, and **edges** carry the marks **needs** (cannot follow it
+  without) and **uses** (doing it carries it out), independently. Topics
+  become **areas**, a tree with one home per idea, used for lookup and
+  coverage and never as prerequisites. Answers record the **depth** their
+  question demanded (state, use, transfer) instead of ideas getting levels. v0
+  showed items growing without a rule (median 254 characters), chains carrying
+  three meanings, and searches that missed into duplicates.
+- **2026-11-08.** Principle 12: structure is recorded now for a model fitted
+  later; the memory model keeps reading only an idea's own answers until a
+  graph-aware one predicts held-out answers better. Principle 6 gains that the
+  model is for assessment, not retention: forgetting is fine.
+- **2026-11-08.** Dry run of the v1 rules: two agents each migrated three
+  slices of the v0 model (93 propositions, 58 chains) on their own. They agreed
+  on whether to split a proposition 80 times out of 93 and on its kind 50 out
+  of 51, but on its area only 58 out of 93, and on an edge's marks 87 out of
+  103 (27 of 40 for code and ML ideas, where they read needs and uses as
+  exclusive). The rules gained: consequences and named bundles under test 2;
+  arguments as proofs; terms as ideas before they are asked; both edge
+  questions asked separately, with defaults by kind and closest edges only; and
+  how to pick or make an area.
+- **2026-11-08.** Second dry run with those rules and a starting area tree.
+  Areas improved (67 of 93 the same) and chains too (53 of 58), but split
+  decisions got worse (64 of 93): the rules that told agents to make more ideas
+  (consequences, terms in advance) were applied differently by each. They are
+  replaced by "when unclear, keep it whole; split when answers show the parts
+  coming apart", which is the knowledge-component rule, and by adding ideas
+  when a task leans on them. Edges: the two agents shared at least one mark on
+  136 of 139 edges but disagreed on adding the second on 30, mostly in code
+  and ML, so the second mark is noisy; it stays, as data for a later model.

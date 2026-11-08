@@ -9,34 +9,38 @@ Why it works the way it does, and what it draws on, is in
 
 ## The loop
 
-1. **Look up.** `reader check girsanov, #sde` shows the matching ideas, what
-   they rest on, and what rests on them, each with R, the probability the
-   reader recalls it today.
+1. **Look up.** `reader context girsanov` shows an idea, what it needs and
+   uses, and what needs and uses it, each with R, the probability the reader
+   recalls it now; `reader context stochastic-calculus` lists an area with its
+   coverage, and a miss says where it looked.
 2. **Ask.** When R and the task leave it unsettled, the agent asks a short
    question block (`reader ask`): multiple choice with a confidence digit, a
    formula written by hand, or one free line.
 3. **Record.** The reader's one-line reply goes to `reader answer`, which
    grades it and records the evidence at once.
 
-Ideas are added with `reader new`, fixed with `reader amend`, and removed with
-`reader delete`, which moves any answers to `archive.md` rather than dropping
-them. An answer that should not count is set aside the same way with
-`reader retract`.
+Ideas are added with `reader add` (blocks on stdin), changed or moved with
+`reader edit`, and removed with `reader rm`, which moves any answers to
+`archive.md` rather than dropping them. An answer that should not count is set
+aside the same way with `reader answer --retract`. A step of pairing work that
+a test verified is recorded with `reader observed`.
 
-Evidence comes only from questions asked and answered, never from
-conversation or self-report. A memory model (FSRS-6 for now, on elapsed time
-to the minute) turns each idea's answers into R. The model is plain files: propositions (checkable claims),
-chains (premises that give a conclusion by a step), and one line per answer.
+Evidence comes only from questions asked and answered and from verified work,
+never from conversation or self-report. A memory model (FSRS-6 for now, on
+elapsed time to the minute) turns each idea's answers into R. The model is
+plain files: one markdown file per area, holding its ideas (name, kind,
+statement, and edges marked needs or uses), and one line per answer. The words
+are defined in [GLOSSARY.md](GLOSSARY.md).
 
 ## See it
 
 `reader graph` serves the whole model on localhost and opens it in the browser
 as a force-directed graph; `reader graph girsanov` shows just that
-neighbourhood. The ↻ button (or `r`) rebuilds the page from the model, keeping
+neighbourhood, and `reader graph maths/analysis` an area. The ↻ button (or `r`) rebuilds the page from the model, keeping
 the layout, so answers recorded meanwhile show up. `--out page.html` writes a
 static page instead. Nodes are coloured by
-R (grey: never asked), a chain is a fork from its premises to its conclusion,
-implications flow down the page (premises above what rests on them), and
+R (grey: never asked), an edge is solid when it needs and dashed when it only
+uses, what an idea rests on sits above it, and
 clicking a node shows its statement and every answer. It follows the system's
 light or dark mode, with a toggle.
 
@@ -59,25 +63,26 @@ Settings come from the environment, or from `config.toml` in the model folder:
 | -------------------- | ------------- | --------------------------------------------- |
 | `READER_HOME`        |               | the model folder (default `~/.local/share/reader`) |
 | `READER_VAULT`       | `vault`       | a folder of the reader's markdown notes, shown as hints |
-| `READER_SCOUT_MODEL` | `scout_model` | a [pi](https://github.com/badlogic/pi-mono) model that drafts propositions from notes |
+| `READER_SCOUT_MODEL` | `scout_model` | a [pi](https://github.com/badlogic/pi-mono) model that drafts ideas from notes |
 
-Both the vault and the scout are optional. Run `reader upkeep` daily to lint
+Both the vault and the scout are optional. Run `reader upkeep` daily to check
 and back up the model (it commits to the model folder's git repo, and pushes
-when it has a remote).
+when it has a remote) and to list duplicates and areas worth splitting.
 
 ## Code
 
 | module         | what it owns                                              |
 | -------------- | --------------------------------------------------------- |
-| `records.py`   | the records: propositions, chains, answers                |
-| `store.py`     | the model folder and its line formats                     |
+| `records.py`   | the records: ideas (with their edges) and answers         |
+| `store.py`     | the model folder, its area files and its line formats     |
 | `memory.py`    | the memory model: answers → R (swap this for a better one) |
-| `model.py`     | the graph in memory: lookups, search, recall per id       |
+| `model.py`     | the model in memory: names, edges, areas and coverage, search, recall per idea |
 | `questions.py` | question blocks: parse, render, grade replies             |
 | `vault.py`     | the optional notes folder, read only                      |
-| `upkeep.py`    | lint, duplicates, calibration, backup, drafting           |
+| `upkeep.py`    | checks, duplicates, areas to split, calibration, backup, drafting |
 | `view.py`      | the graph page (`reader graph`) and its local server; template and vendored [force-graph](https://github.com/vasturiano/force-graph) (MIT) in `assets/` |
 | `cli.py`       | arguments and printing                                    |
+| `migrate.py`   | one-off: a v0 folder (propositions, chains) → v1 (areas)  |
 
 ## Test
 

@@ -1,6 +1,7 @@
 # reader
 
-Keep to the core loop: propositions and chains, evidence about them,
+Keep to the core loop: ideas and the edges between them (marked needs and
+uses), evidence about them,
 a memory model that turns evidence into recall probabilities, and agents that
 decide from those numbers and the task whether to ask.
 
@@ -8,12 +9,13 @@ decide from those numbers and the task whether to ask.
   teaching, self-report or vault notes.
 - Output raw recall probabilities, not labels or verdicts; the agent judges
   what the task needs.
-- An answer updates only the id it is about. Propagation through chains, review
+- An answer updates only the id it is about. Propagation along edges, review
   scheduling and better memory models are later, swappable work.
 - States stay few and simple, and every answer is written the moment it is
   graded.
 
-`PHILOSOPHY.md` gives the reason for each rule. A change that bends a principle
+`PHILOSOPHY.md` gives the reason for each rule, and `GLOSSARY.md` the words.
+A change that bends a principle
 updates it there first and adds a dated line to its decision log.
 
 Nothing in the code or the skills is about one reader: who they are lives in

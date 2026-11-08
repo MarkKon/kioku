@@ -1,9 +1,9 @@
 """The model as a picture: one self-contained HTML page with a force-directed graph.
 
-Propositions are nodes, coloured by R. A chain is drawn as a fork: its premises
-join at a small knot, and one arrow leads on to the conclusion. A chain with
-one premise is a plain arrow. The layout pulls premises above their conclusions,
-so implications point down the page. Nothing here writes to the model.
+Ideas are nodes, coloured by R. An edge is an arrow from the idea needed or
+used to the idea that needs or uses it: solid when it needs it, dashed when it
+only uses it. The layout pulls what an idea rests on above it. Nothing here
+writes to the model.
 
 `reader graph` serves the page on localhost, building it afresh on every
 request, so the page's refresh button shows answers recorded since it opened.
@@ -20,44 +20,44 @@ from .model import Model
 from .records import Answer
 
 
+def around(m: Model, seeds: list[str], depth: int = 2) -> list[str]:
+    """The seeds, what they rest on (`depth` steps along needs and uses), and what
+    rests on them directly."""
+    out, frontier = list(dict.fromkeys(seeds)), list(seeds)
+    seen = set(out)
+    for _ in range(depth):
+        nxt = [j for i in frontier for j in (*m.needs.get(i, ()), *m.uses.get(i, ()))
+               if j not in seen]
+        seen.update(nxt)
+        out += list(dict.fromkeys(nxt))
+        frontier = nxt
+    for i in seeds:
+        for j in (*m.needed_by.get(i, ()), *m.used_by.get(i, ())):
+            if j not in seen:
+                seen.add(j)
+                out.append(j)
+    return out
+
+
 def graph(m: Model, ids: list[str] | None = None, focus: Iterable[str] = ()) -> dict:
-    """Nodes and links for the props and chains in `ids` (everything if None).
-
-    Chains whose ends are all shown are drawn too; a chain in `ids` brings its
-    ends along. `focus` marks the ids that were looked up."""
+    """Nodes and links for the ideas in `ids` (everything if None); `focus` marks
+    the ideas that were looked up. A link runs from the idea needed or used to the
+    idea that needs or uses it, and says which marks it carries."""
     focus = set(focus)
-    pids = set(m.props) if ids is None else {i for i in ids if i in m.props}
-    cids = set(m.chains) if ids is None else {i for i in ids if i in m.chains}
-    for cid in cids:
-        c = m.chains[cid]
-        pids.update((*c.premises, c.conclusion))
-    cids |= {c.id for c in m.chains.values()
-             if c.conclusion in pids and all(p in pids for p in c.premises)}
-    pids &= set(m.props)
-
-    nodes, links, chains = [], [], {}
-    for pid in sorted(pids):
-        p = m.props[pid]
-        nodes.append({"id": pid, "name": p.name, "statement": p.statement,
-                      "topics": list(p.topics), "vault": p.vault,
-                      "focus": pid in focus, **_recall(m, pid)})
-    for cid in sorted(cids):
-        c = m.chains[cid]
-        if c.conclusion not in pids or any(p not in pids for p in c.premises):
-            continue
-        chains[cid] = {"id": cid, "name": m.name(cid), "step": c.step,
-                       "premises": list(c.premises), "conclusion": c.conclusion,
-                       "focus": cid in focus, **_recall(m, cid)}
-        if len(c.premises) == 1:
-            links.append({"source": c.premises[0], "target": c.conclusion,
-                          "chain": cid, "arrow": True})
-            continue
-        nodes.append({"id": cid, "knot": True, "chain": cid})
-        links += [{"source": p, "target": cid, "chain": cid, "arrow": False}
-                  for p in c.premises]
-        links.append({"source": cid, "target": c.conclusion, "chain": cid, "arrow": True})
-    return {"now": f"{m.now:%Y-%m-%d %H:%M}", "nodes": nodes, "links": links,
-            "chains": chains}
+    keep = set(m.ideas) if ids is None else {i for i in ids if i in m.ideas}
+    nodes, links = [], []
+    for iid in sorted(keep):
+        i = m.ideas[iid]
+        nodes.append({"id": iid, "name": i.name, "kind": i.kind, "area": i.area,
+                      "statement": i.statement, "aliases": list(i.aliases), "vault": i.vault,
+                      "focus": iid in focus, **_recall(m, iid)})
+    for src in sorted(keep):
+        for dst in dict.fromkeys((*m.needs.get(src, ()), *m.uses.get(src, ()))):
+            if dst in keep:
+                links.append({"source": dst, "target": src,
+                              "needs": dst in m.needs.get(src, ()),
+                              "uses": dst in m.uses.get(src, ())})
+    return {"now": f"{m.now:%Y-%m-%d %H:%M}", "nodes": nodes, "links": links}
 
 
 def html(data: dict, title: str = "reader", live: bool = False) -> str:

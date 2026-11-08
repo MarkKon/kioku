@@ -1,8 +1,9 @@
-"""Keeping the model sound: lint, duplicates, calibration, backup and drafting.
+"""Keeping the model sound: lint, duplicates, areas to split, calibration, backup
+and drafting.
 
 None of this writes evidence. Drafting asks a cheap read-only model (through
-`pi`) to propose propositions for finished vault notes; a person or agent
-approves them before they are added.
+`pi`) to propose ideas for finished vault notes; a person or agent approves
+them before they are added.
 """
 
 from __future__ import annotations
@@ -25,28 +26,38 @@ reader knows. You work in their vault, a folder of markdown notes:
 notes/<id>.md, with YAML frontmatter (`aliases:` holds the title, `status:`
 stub/wip/developed) and links [[id|label]]. Never create, edit or move any
 file. Search with grep and find, read what you need, and answer tersely. When
-asked for propositions, give one per line as
+asked for ideas, give each as a block for `reader add`:
 
-  reader new prop "<name>" "<statement, LaTeX in $…$, assumptions inside>" --topics <t> --vault <id>
+  ## <kebab-case-name> · definition|result|proof|method · <area, e.g. maths/analysis>
+  <the statement, LaTeX in $…$, readable alone>
+  - needs: <names of ideas you cannot follow it without>
+  - uses: <names of ideas that doing it carries out>
+  - vault: <note id>
 
-with a kebab-case name, one checkable claim per line, taken from a note's own
-definition or theorem block; then chains as
+one idea per block, taken from a note's own definition or theorem block; a
+proof is its own idea. Leave out a line that would be empty. Cite note ids. No
+preamble."""
 
-  reader new chain <name-a> <name-b> => <name-c> --step "<the reasoning step>"
-
-using the names you proposed. Cite note ids. No preamble."""
+AREA_LIMIT = 40  # an area listing stops fitting a screen
+CLUSTER = 5  # ideas linked mostly to each other: a sub-area
 
 
 def lint(store: Store, m: Model, vault: Vault | None) -> list[str]:
-    """Every file parses, every id resolves, and every answer matches its question."""
+    """Every file parses, every name and edge resolves, nothing forms a cycle, and every
+    answer matches its question."""
     problems = list(m.problems)
-    for c in m.chains.values():
-        problems += [f"{c.id}: unknown proposition {p}"
-                     for p in (*c.premises, c.conclusion) if p not in m.props]
+    names: dict[str, str] = {}
+    for i in m.ideas.values():
+        if i.name in names:
+            problems.append(f"{i.id}: name {i.name} is also {names[i.name]}'s")
+        names.setdefault(i.name, i.id)
+        problems += [f"{i.name}: edge to unknown idea {n}" for n in (*i.needs, *i.uses)
+                     if n not in m.by_name]
+    problems += [f"cycle: {' → '.join(m.name(x) for x in c)}" for c in m.cycles()]
     seen = set()
     for a in m.answers:
         where = f"{a.ask}/{a.n}"
-        if not m.exists(a.id):
+        if a.id not in m.ideas:
             problems.append(f"{where}: unknown id {a.id}")
         if (a.ask, a.n) in seen:
             problems.append(f"{where}: answered twice")
@@ -57,21 +68,55 @@ def lint(store: Store, m: Model, vault: Vault | None) -> list[str]:
         elif a.n > len(ask["items"]) or ask["items"][a.n - 1]["id"] != a.id:
             problems.append(f"{where}: does not ask about {a.id}")
     if vault:
-        problems += [f"{p.id}: no vault note {p.vault}"
-                     for p in m.props.values() if p.vault and p.vault not in vault]
+        problems += [f"{i.name}: no vault note {i.vault}"
+                     for i in m.ideas.values() if i.vault and i.vault not in vault]
     return problems
 
 
 def dupes(m: Model, threshold: float = 0.85) -> list[str]:
-    ps = list(m.props.values())
-    keys = [(norm(p.name), norm(p.statement)) for p in ps]
+    ideas = list(m.ideas.values())
+    keys = [(norm(i.name), norm(i.statement)) for i in ideas]
     out = []
-    for i in range(len(ps)):
-        for j in range(i + 1, len(ps)):
-            r = max(difflib.SequenceMatcher(None, keys[i][0], keys[j][0]).ratio(),
-                    difflib.SequenceMatcher(None, keys[i][1], keys[j][1]).ratio())
+    for a in range(len(ideas)):
+        for b in range(a + 1, len(ideas)):
+            r = max(difflib.SequenceMatcher(None, keys[a][0], keys[b][0]).ratio(),
+                    difflib.SequenceMatcher(None, keys[a][1], keys[b][1]).ratio())
             if r >= threshold:
-                out.append(f"{r:.2f}  {ps[i].id} {ps[i].name}  ~  {ps[j].id} {ps[j].name}")
+                out.append(f"{r:.2f}  {ideas[a].name}  ~  {ideas[b].name}")
+    return out
+
+
+def to_split(m: Model) -> list[str]:
+    """Areas too big for one listing, and clusters of ideas inside an area that are
+    linked mostly to each other: candidates for a sub-area."""
+    out = []
+    for area in sorted(m.areas):
+        own = m.in_area(area)
+        if len(own) > AREA_LIMIT:
+            out.append(f"{area}: {len(own)} ideas, more than one listing holds")
+        inside = set(own)
+        comp: dict[str, int] = {}
+        for start in own:
+            if start in comp:
+                continue
+            stack, comp[start] = [start], len(comp)
+            k = comp[start]
+            while stack:
+                x = stack.pop()
+                for y in (*m.needs.get(x, ()), *m.uses.get(x, ()),
+                          *m.needed_by.get(x, ()), *m.used_by.get(x, ())):
+                    if y in inside and y not in comp:
+                        comp[y] = k
+                        stack.append(y)
+        groups: dict[int, list[str]] = {}
+        for x, k in comp.items():
+            groups.setdefault(k, []).append(x)
+        if len(groups) > 1:
+            for g in groups.values():
+                if len(g) >= CLUSTER:
+                    out.append(f"{area}: {len(g)} ideas linked only to each other: "
+                               + ", ".join(sorted(m.name(x) for x in g)[:6])
+                               + (" …" if len(g) > 6 else ""))
     return out
 
 
@@ -105,17 +150,26 @@ def scout(cfg: Config, task: str, timeout: int) -> str:
 
 def run(cfg: Config, store: Store, m: Model, vault: Vault | None,
         draft: bool, limit: int, timeout: int) -> str:
-    """The daily pass: lint, back up, duplicates, and notes still without propositions."""
+    """The daily pass: check, back up, duplicates, areas to split, calibration, and vault
+    notes still without ideas."""
     store.init()
     report = [f"# reader upkeep · {cfg.today}"]
     problems = lint(store, m, vault)
-    report.append("lint problems:\n" + "\n".join(problems) if problems
-                  else f"lint: ok · {len(m.props)} propositions, {len(m.chains)} chains, "
+    report.append("problems:\n" + "\n".join(problems) if problems
+                  else f"check: ok · {len(m.ideas)} ideas, {len(m.areas)} areas, "
                        f"{len(m.answers)} answers")
     report += _backup(cfg.home, cfg.today)
     d = dupes(m)
     if d:
         report.append("likely duplicates (merge by hand):\n" + "\n".join(d))
+    s = to_split(m)
+    if s:
+        report.append("areas to consider splitting (`reader edit a,b,c --area <new> "
+                      "--new-area`):\n" + "\n".join(s))
+    bins = calibration(m)
+    if bins:
+        report.append("confidence digits (conf · picks · right):\n" + "\n".join(
+            f"  {c}  {n:>3}  {right:>4.0%}" for c, (n, right) in bins.items()))
     if vault:
         report.append(_draft(cfg, store, m, vault, draft, limit, timeout))
     return "\n\n".join(report)
@@ -139,27 +193,26 @@ def _draft(cfg: Config, store: Store, m: Model, vault: Vault,
     proposals = store.home / "proposals.md"
     handled = set(re.findall(r"^## (\S+) ", proposals.read_text() if proposals.exists() else "",
                              re.M))
-    pointed = {p.vault for p in m.props.values() if p.vault}
+    pointed = {i.vault for i in m.ideas.values() if i.vault}
     todo = sorted(((vault.developed_date(n.id) or dt.date.min, n) for n in vault.notes().values()
                    if n.status == "developed" and n.type in ("", "note")
                    and n.id not in pointed | handled),
                   key=lambda x: x[0], reverse=True)
     batch = todo[:limit]
     if not batch:
-        return "vault: no new developed notes"
+        return "vault: no developed notes without ideas"
     if not draft:
-        return (f"vault: {len(todo)} developed notes without propositions; newest:\n"
+        return (f"vault: {len(todo)} developed notes without ideas; newest:\n"
                 + "\n".join(f"  {n.id}  {n.title}  ({day})" for day, n in batch))
     out = []
     for day, n in batch:
         try:
             body = scout(cfg, f"Read notes/{n.id}.md and the notes it links to. Propose the "
-                              f"propositions (and chains between them) that note {n.id} states, "
-                              f"at most 6.", timeout)
+                              f"ideas that note {n.id} states, at most 6.", timeout)
         except RuntimeError as e:
             body = f"(scout failed: {e})"
         out += ["", f"## {n.id} · {n.title} · developed {day} · proposed {cfg.today}", body]
     with proposals.open("a") as f:
         f.write("\n".join(out) + "\n")
-    return (f"vault: drafted propositions for {len(batch)} of {len(todo)} notes into "
+    return (f"vault: drafted ideas for {len(batch)} of {len(todo)} notes into "
             f"proposals.md: " + ", ".join(n.id for _, n in batch))

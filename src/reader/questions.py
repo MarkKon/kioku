@@ -14,17 +14,20 @@ import re
 import string
 from dataclasses import dataclass, field
 
-from .records import Answer
-from .store import ID
+from .records import DEPTHS, Answer
 from .text import short
 
-ITEM_RE = re.compile(r"^(\d+)\s+(pick|write|say)\s+(" + ID + r"):\s*(.*)$")
+# `1 pick banach-fixed-point use: …`: the item's idea (name, alias or id) and, optionally,
+# the depth it demands (default use)
+ITEM_RE = re.compile(r"^(\d+)\s+(pick|write|say)\s+([^\s:]+)(?:\s+(" + "|".join(DEPTHS)
+                     + r"))?:\s*(.*)$")
 REPLY_RE = re.compile(r"(?:(?<=[\s,;])|^)(\d{1,2})([a-h][0-9]?|[.=~x?\-])(?=[\s,;:]|$)")
 
 
 def parse_block(text: str) -> tuple[str, list[dict], list[str]]:
     """Block text → (title, items, problems). Each item is a dict:
-    n, kind, id, q, options [{text, correct, mis}], why, ref."""
+    n, kind, id (as written: the caller resolves it), depth, q, options
+    [{text, correct, mis}], why, ref."""
     title, items, problems = "", [], []
     for raw in text.splitlines():
         line = raw.rstrip()
@@ -35,8 +38,8 @@ def parse_block(text: str) -> tuple[str, list[dict], list[str]]:
             continue
         m = ITEM_RE.match(line)
         if m:
-            items.append({"n": int(m[1]), "kind": m[2], "id": m[3], "q": m[4],
-                          "options": [], "why": "", "ref": ""})
+            items.append({"n": int(m[1]), "kind": m[2], "id": m[3], "depth": m[4] or "use",
+                          "q": m[5], "options": [], "why": "", "ref": ""})
             continue
         if not items:
             problems.append(f"before the first item: {line}")
@@ -127,7 +130,7 @@ def grade_say(ask: dict, n: int, grade: str, now: dt.datetime, mis: str | None =
     text = f"misconception: {mis}" if mis else note or short(it.get("answer", ""), 80) \
         or "graded by the agent"
     return Answer(now, it["id"], it["kind"], grade, ask["id"], n,
-                  flag="mis" if mis else None, note=text)
+                  flag="mis" if mis else None, depth=it.get("depth"), note=text)
 
 
 def parse_reply(reply: str, n_items: int) -> list[tuple[int, str, str]]:
@@ -159,7 +162,8 @@ def _grade_item(qid: str, it: dict, tok: str, thoughts: str,
     right = next((o for o in it["options"] if o["correct"]), {"text": "", "mis": ""})
 
     def answer(grade, note, conf=None, flag=None):
-        return Answer(now, it["id"], kind, grade, qid, n, conf, flag, note + said)
+        return Answer(now, it["id"], kind, grade, qid, n, conf, flag, it.get("depth"),
+                      note + said)
 
     if tok == "-":
         return "never met", answer("again", "never met it", flag="unseen"), True

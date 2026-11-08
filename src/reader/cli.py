@@ -1,9 +1,10 @@
 """reader: what a reader has shown they know, as recall probabilities.
 
-The loop: look an idea up (`check`), ask what the lookup does not settle
-(`ask`), and pass the reply on (`answer`, `grade`), which records it at once.
-Evidence comes only from questions asked and answered. A memory model turns
-each id's answers into R, the chance they recall it now.
+The loop: look ideas up (`context`), ask what the lookup does not settle
+(`ask`), and pass the reply on (`answer`), which records it at once. Evidence
+comes only from questions asked and answered, and from verified work
+(`observed`). A memory model turns each idea's answers into R, the chance
+they recall it now.
 
 This module parses arguments and prints; the work lives in the modules below.
 """
@@ -13,19 +14,21 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import re
+import select
 import shutil
 import subprocess
 import sys
 import webbrowser
+from dataclasses import replace
 from pathlib import Path
 from typing import NoReturn
 
 from . import config, questions, upkeep, view
-from .memory import Recall
 from .model import Model
-from .records import GRADES, Chain, Prop
-from .store import ID, QID, SEP, Store, format_answer, new_id, parse_chain
-from .text import norm, short
+from .records import GRADES, IDEA_KINDS, Answer, Idea
+from .store import AREA, NAME, QID, SEP, Snapshot, Store, block_idea, check_block, \
+    format_answer, new_id, parse_blocks
+from .text import short
 from .vault import Vault
 
 
@@ -54,39 +57,63 @@ def terms_of(args: list[str]) -> list[str]:
     return [t.strip() for t in " ".join(args).split(",") if t.strip()]
 
 
+def stdin_text(required: bool) -> str:
+    """What was piped in: a heredoc or a file. Never waits on a terminal."""
+    if sys.stdin is None or sys.stdin.isatty():
+        if required:
+            die("pipe the ideas in, e.g. `reader add <<'EOF'` … `EOF`")
+        return ""
+    if not required and not select.select([sys.stdin], [], [], 0.2)[0]:
+        return ""
+    return sys.stdin.read()
+
+
 # -- output
+
+LEGEND = "R = recall now, – = never asked"
+
 
 def fmt_r(r: float | None) -> str:
     """Rounded down, so only a fresh right answer reads 1."""
     return "–" if r is None else "1" if r >= 1 else f"{int(r * 100) / 100:.2f}".lstrip("0")
 
 
-def when(m: Model, t: dt.datetime) -> str:
+def when(m: Model, t: dt.datetime | None) -> str:
     """The time of an answer: hours and minutes today, the date before."""
+    if t is None:
+        return "never"
     return f"{t:%H:%M}" if t.date() == m.today else f"{t:%m-%d}"
 
 
-def row(m: Model, iid: str, width: int = 28) -> str:
-    """id, name, R, answers, last answer, and what else an agent needs to judge."""
-    rc: Recall = m.recall(iid)
-    p = m.props.get(iid)
-    last = rc.last
-    last_s = f"{when(m, last.at)} {last.grade}" if last else "no evidence"
-    notes = []
-    if last and last.flag == "mis":
-        notes.append(f"! last answer: {short(last.note or 'misconception', 80)}")
-    if last and last.flag == "unseen":
-        notes.append("last answer: never met it")
-    if p and p.vault:
-        notes.append(f"vault {p.vault}")
-    notes.append(short(p.statement, 70) if p else "step: " + short(m.chains[iid].step, 70))
-    return (f"  {iid:<8}{short(m.name(iid), width):<{width + 1}}R {fmt_r(rc.r):>3}  "
-            f"n{rc.n:<2} {last_s:<12}  " + " · ".join(notes))
+def width_for(m: Model, ids: list[str]) -> int:
+    """A name column as wide as the longest name shown (names are identities: never cut)."""
+    return max([18, *(len(m.ideas[i].name) for i in ids)])
+
+
+def row(m: Model, iid: str, label: str | None = None, width: int = 30) -> str:
+    """name, kind, R, answers, last answer and its grade, deepest depth shown. With a
+    label (`needs`, `used by`; '' continues the one above) the row is indented under it."""
+    i, rc = m.ideas[iid], m.recall(iid)
+    last = f"{when(m, rc.last.at)} {rc.last.grade}" if rc.last else ""
+    flags = []
+    if rc.last and rc.last.flag == "mis":
+        flags.append(f"! misconception: {short(rc.last.note.removeprefix('misconception: '), 70)}")
+    elif rc.last and rc.last.flag == "unseen":
+        flags.append("never met it")
+    head = f"  {label:<11}" if label is not None else "  "
+    return (f"{head}{i.name:<{width + 1}}{i.kind:<11}R {fmt_r(rc.r):>3}  "
+            f"n{rc.n:<3}{last:<12} {m.deepest(iid) or '':<9}" + "  ".join(flags)).rstrip()
+
+
+def coverage_line(m: Model, ids: list[str]) -> str:
+    c = m.coverage(ids)
+    return f"{c.ideas} idea{'' if c.ideas == 1 else 's'} · {c.asked} asked · last {when(m, c.last)}"
 
 
 def warn(m: Model):
     if m.problems:
-        print(f"({len(m.problems)} parse problem(s); `reader lint`)", file=sys.stderr)
+        print(f"({len(m.problems)} problem(s) in the model files; `reader upkeep --check`)",
+              file=sys.stderr)
 
 
 # -- commands: looking up
@@ -105,43 +132,126 @@ def cmd_profile(ctx: Context, a):
     print(text.strip())
 
 
-def cmd_check(ctx: Context, a):
-    m, terms = ctx.model, terms_of(a.terms)
+def cmd_context(ctx: Context, a):
+    m, terms = ctx.model, terms_of(a.what)
+    print(f"reader context · {ctx.cfg.now:%Y-%m-%d %H:%M} · {LEGEND}")
     if not terms:
-        die("check needs ids or terms, e.g. `reader check p_k2x9, girsanov, #sde`")
-    found = m.lookup(terms, a.depth, None if a.all else 30)
-    print(f"reader check · {', '.join(terms)} · {ctx.cfg.now:%Y-%m-%d %H:%M}"
-          f" · R = recall probability now, – = no evidence")
-    for title, ids in (("matched", found.matched), ("rests on (chains, then premises)",
-                       found.rests_on), ("rests on it", found.rests_on_it)):
-        if ids:
-            print(title)
-            print("\n".join(row(m, i) for i in ids))
-    notes = ctx.vault.matching([t for t in terms if not t.startswith("#") and not m.exists(t)],
-                               {p.vault for p in m.props.values() if p.vault}) if ctx.vault else []
-    if notes:
-        print("vault notes with no proposition (hints, not evidence)")
-        for n in notes:
-            print(f"  {n.id}  {short(n.title, 50)}  ({n.status or n.type})")
-    if not found.matched and not notes:
-        print("nothing recorded; add the idea with `reader new prop`, then ask")
+        show_tree(m)
+    for t in terms:
+        print()
+        if (iid := m.resolve(t)) is not None:
+            show_idea(ctx, iid, a.answers)
+        elif (area := m.area_of(t)) is not None:
+            show_area(m, area)
+        else:
+            show_search(ctx, t)
     warn(m)
 
+
+def show_tree(m: Model):
+    print(f"{len(m.ideas)} ideas · {len({a.id for a in m.answers})} asked · "
+          f"{len(m.answers)} answers")
+    for top in m.children(""):
+        print(f"  {top + '/':<40}{coverage_line(m, m.in_area(top, deep=True))}")
+        for sub in m.children(top):
+            print(f"    {sub.split('/', 1)[1] + '/':<38}{coverage_line(m, m.in_area(sub, deep=True))}")
+    mis = [i for i in m.ideas if (last := m.recall(i).last) and last.flag == "mis"]
+    if mis:
+        print("misconceptions in the last answer:")
+        print("\n".join(row(m, i, width=width_for(m, mis)) for i in mis))
+
+
+def show_area(m: Model, area: str):
+    own = m.in_area(area)
+    print(f"{area} · {coverage_line(m, m.in_area(area, deep=True))}")
+    w = width_for(m, own)
+    print("\n".join(row(m, i, width=w) for i in own) or "  (no ideas of its own)")
+    for sub in m.children(area):
+        name = sub[len(area) + 1:] + "/"
+        print(f"  {name:<41}{coverage_line(m, m.in_area(sub, deep=True))}")
+
+
+def show_idea(ctx: Context, iid: str, answers: bool):
+    m = ctx.model
+    i, rc = m.ideas[iid], m.recall(iid)
+    last = f" · last {when(m, rc.last.at)} {rc.last.grade}" if rc.last else ""
+    depth = f" ({m.deepest(iid)})" if m.deepest(iid) else ""
+    print(f"{i.name}{SEP}{i.kind}{SEP}{i.area}{SEP}R {fmt_r(rc.r)} n{rc.n}{last}{depth}")
+    print(f"  {i.statement}")
+    extra = [f"aliases: {', '.join(i.aliases)}"] if i.aliases else []
+    if i.vault:
+        extra.append(f"vault: {i.vault}")
+    if extra:
+        print("  " + " · ".join(extra))
+    groups = (("needs", m.needs), ("uses", m.uses), ("needed by", m.needed_by),
+              ("used by", m.used_by))
+    w = width_for(m, [j for _, e in groups for j in e.get(iid, [])])
+    for label, edges in groups:
+        for k, j in enumerate(edges.get(iid, [])):
+            print(row(m, j, label if k == 0 else "", w))
+    broken = [n for n in (*i.needs, *i.uses) if n not in m.by_name]
+    if broken:
+        print(f"  edges to unknown names: {', '.join(broken)}")
+    if rc.last and rc.last.flag == "mis":
+        print(f"  ! last answer shows a misconception: {rc.last.note}")
+    print(f"  {i.area} · {coverage_line(m, m.in_area(i.area))}")
+    if answers:
+        for ans in m.answers_for(iid):
+            print(f"  {format_answer(ans)[2:]}")
+            ask = ctx.store.ask(ans.ask)
+            if ask and ans.n <= len(ask["items"]):
+                print(f"      asked: {short(ask['items'][ans.n - 1]['q'], 110)}")
+        if rc.r is not None:
+            print(f"  R now {rc.r:.3f}, stability {rc.stability:.1f} days")
+
+
+def show_search(ctx: Context, term: str):
+    m = ctx.model
+    hits = m.search(term)
+    if hits:
+        print(f"\"{term}\" · no idea or area of that name; {len(hits)} idea(s) mention it")
+        print("\n".join(row(m, i, width=width_for(m, hits)) for i in hits))
+        regions = dict.fromkeys(m.ideas[i].area for i in hits)
+        for area in list(regions)[:3]:
+            print(f"  {area} · {coverage_line(m, m.in_area(area))}")
+    else:
+        print(f"no idea, alias or statement matches \"{term}\" ({len(m.ideas)} ideas searched)")
+        near = m.nearest(term)
+        for k, j in enumerate(near):
+            print(row(m, j, "nearest" if k == 0 else "", width_for(m, near)))
+        for area in dict.fromkeys(m.ideas[j].area for j in near[:1]):
+            print(f"  {area} · {coverage_line(m, m.in_area(area))}")
+    notes = ctx.vault.matching([term], {i.vault for i in m.ideas.values() if i.vault}) \
+        if ctx.vault else []
+    if notes:
+        print("  vault notes with no idea (hints, not evidence):")
+        for n in notes:
+            print(f"    {n.id}  {short(n.title, 50)}  ({n.status or n.type})")
+
+
+# -- commands: the graph page
 
 def graph_page(ctx: Context, terms: list[str], depth: int, live: bool) -> str:
     m = ctx.model
     if terms:
-        found = m.lookup(terms, depth, None)
-        if not found.matched:
+        seeds: list[str] = []
+        for t in terms:
+            if (iid := m.resolve(t)) is not None:
+                seeds.append(iid)
+            elif (area := m.area_of(t)) is not None:
+                seeds += m.in_area(area, deep=True)
+            else:
+                seeds += m.search(t, limit=30)
+        if not seeds:
             die(f"nothing matches {', '.join(terms)}")
-        data = view.graph(m, found.matched + found.rests_on + found.rests_on_it, found.matched)
+        data = view.graph(m, view.around(m, seeds, depth), seeds)
     else:
         data = view.graph(m)
     return view.html(data, "reader · " + (", ".join(terms) or "everything"), live)
 
 
 def cmd_graph(ctx: Context, a):
-    terms = terms_of(a.terms)
+    terms = terms_of(a.what)
     if a.out:
         out = Path(a.out).expanduser()
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -157,193 +267,217 @@ def cmd_graph(ctx: Context, a):
                             None if a.no_open else webbrowser.open(url)))
 
 
-def cmd_find(ctx: Context, a):
-    m, terms = ctx.model, terms_of(a.terms)
-    hits = m.find(terms, a.limit)
-    for pid in hits:
-        p = m.props[pid]
-        print(f"{pid:<8}{short(p.name, 28):<29}{short(p.statement, 100)}")
-    for c in m.chains.values():
-        if any(pid in (c.conclusion, *c.premises) for pid in hits[:3]):
-            print(f"{c.id:<8}{short(m.name(c.id), 120)}")
-    notes = ctx.vault.matching(terms, {p.vault for p in m.props.values() if p.vault},
-                               a.limit) if ctx.vault else []
-    for n in notes:
-        print(f"vault {n.id}  {short(n.title, 50)}  ({n.status or n.type})")
-    if not hits and not notes:
-        print("no match")
+# -- commands: adding, editing and removing ideas
+
+def canonical(m: Model, names: list[str], extra: dict[str, str]) -> tuple[list[str], list[str]]:
+    """Edge targets (names, aliases or ids) → canonical names, and those that resolve to
+    nothing. `extra` maps names being added in the same call."""
+    out, bad = [], []
+    for n in names:
+        if n in extra:
+            out.append(n)
+        elif (j := m.resolve(n)) is not None:
+            out.append(m.ideas[j].name)
+        else:
+            bad.append(n)
+    return list(dict.fromkeys(out)), bad
 
 
-def cmd_show(ctx: Context, a):
+def check_cycles(m: Model, changed: list[Idea]) -> list[str]:
+    """Cycles the changed ideas would close, as readable paths."""
+    ideas = dict(m.ideas)
+    for i in changed:
+        ideas[i.id] = i
+    trial = Model(Snapshot(ideas, set(), []), m.now)
+    touched = {i.id for i in changed}
+    return [" → ".join(trial.name(x) for x in c) for c in trial.cycles() if c[0] in touched]
+
+
+def cmd_add(ctx: Context, a):
     m = ctx.model
-    if a.id in m.props:
-        p = m.props[a.id]
-        print(f"{p.id} · {p.name} · {p.statement}" + (f" · topics: {', '.join(p.topics)}"
-                                                      if p.topics else ""))
-    elif a.id in m.chains:
-        c = m.chains[a.id]
-        print(f"{c.id} · {m.name(c.id)} · step: {c.step}")
-    else:
-        die(f"no proposition or chain {a.id}")
-    for ans in m.answers_for(a.id):
-        print(f"  {format_answer(ans)[2:]}")
-        ask = ctx.store.ask(ans.ask)
-        if ask and ans.n <= len(ask["items"]):
-            print(f"      asked: {short(ask['items'][ans.n - 1]['q'], 110)}")
-    rc = m.recall(a.id)
-    if rc.r is None:
-        print(f"  no graded answer yet ({rc.n} answer(s))")
-    else:
-        print(f"  R now {rc.r:.3f}, stability {rc.stability:.1f} days, {rc.n} answer(s)")
+    problems: list[str] = []
+    blocks = parse_blocks(stdin_text(required=True), "stdin", problems, need_id=False)
+    if not blocks and not problems:
+        die("no ideas read; want `## name · kind · area`, the statement, then `- needs: …`")
+    batch = {b["name"]: b for b in blocks}
+    taken = set(m.ideas)
+    new: list[Idea] = []
+    new_areas: list[str] = []
+    for b in blocks:
+        where = f"{b['name']}:"
+        problems += [f"{where} {p}" for p in check_block(b)]
+        area = b["third"].strip("/")
+        if not re.fullmatch(AREA, area):
+            problems.append(f"{where} `{area}` is not an area path (e.g. maths/analysis)")
+        elif area not in m.areas and area not in new_areas:
+            if a.new_area:
+                new_areas.append(area)
+            else:
+                near = [x for x in sorted(m.areas) if x.rsplit("/", 1)[-1] in area or area in x]
+                problems.append(f"{where} no area {area} (--new-area makes it"
+                                + (f"; existing: {', '.join(near[:4])}" if near else "") + ")")
+        if b["name"] in m.by_name or sum(x["name"] == b["name"] for x in blocks) > 1:
+            j = m.by_name.get(b["name"])
+            problems.append(f"{where} the name is taken" + (f" by {j}: {short(m.ideas[j].statement, 80)}"
+                                                           if j else " twice in this input"))
+        elif not a.anyway:
+            for r, j in m.similar(b["name"], b["statement"])[:3]:
+                problems.append(f"{where} close to {m.ideas[j].name} ({r:.2f}): "
+                                f"{short(m.ideas[j].statement, 80)} (--anyway adds it regardless)")
+        names = {k: k for k in batch}
+        needs, bad1 = canonical(m, b["needs"], names)
+        uses, bad2 = canonical(m, b["uses"], names)
+        for n in bad1 + bad2:
+            hint = m.nearest(n, 1)
+            problems.append(f"{where} edge to unknown idea `{n}`; add it first or drop the edge"
+                            + (f" (nearest: {m.ideas[hint[0]].name})" if hint else ""))
+        if b["name"] in needs + uses:
+            problems.append(f"{where} an idea cannot need or use itself")
+        if b["vault"] and ctx.vault and b["vault"][0] not in ctx.vault:
+            problems.append(f"{where} no vault note {b['vault'][0]}")
+        iid = new_id("i_", taken)
+        taken.add(iid)
+        new.append(replace(block_idea(b, iid, area), needs=tuple(needs), uses=tuple(uses)))
+    if not problems:
+        problems += [f"cycle: {c}" for c in check_cycles(m, new)]
+    if problems:
+        die("nothing added:\n  " + "\n  ".join(problems))
+    for area in new_areas:
+        ctx.store.make_area(area)
+    ctx.store.write_ideas(new, m.ideas)
+    after = Model(ctx.store.load(), ctx.cfg.now)
+    for i in new:
+        print(f"{i.id} {i.name} → {i.area} (now {len(after.in_area(i.area))} ideas)")
 
 
-def cmd_status(ctx: Context, a):
+def edit_list(m: Model, old: tuple[str, ...], spec: str) -> tuple[tuple[str, ...], list[str]]:
+    """`+a,-b,c` applied to a list of names; plain entries add."""
+    out, bad = list(old), []
+    for e in (x.strip() for x in spec.split(",") if x.strip()):
+        sign, name = (e[0], e[1:]) if e[0] in "+-" else ("+", e)
+        if sign == "-":
+            j = m.resolve(name)
+            target = m.ideas[j].name if j else name
+            if target not in out:
+                bad.append(f"no edge to `{name}` to remove")
+            out = [x for x in out if x != target]
+        else:
+            names, unknown = canonical(m, [name], {})
+            bad += [f"edge to unknown idea `{n}`" for n in unknown]
+            out += [n for n in names if n not in out]
+    return tuple(out), bad
+
+
+def cmd_edit(ctx: Context, a):
     m = ctx.model
-    answered = [i for i in m.ids() if m.recall(i).n]
-    print(f"reader · {ctx.cfg.today} · {len(m.props)} propositions, {len(m.chains)} chains, "
-          f"{len(m.answers)} answers on {len(answered)} ids")
-    topics: dict[str, list[str]] = {}
-    for p in m.props.values():
-        for t in p.topics or ("(none)",):
-            topics.setdefault(t, []).append(p.id)
-    for t, ids in sorted(topics.items(), key=lambda kv: -len(kv[1]))[:15]:
-        rs = [r for i in ids if (r := m.recall(i).r) is not None]
-        mean = f"  mean R {sum(rs) / len(rs):.2f}" if rs else ""
-        print(f"  #{t:<24}{len(ids):>3} props, {len(rs):>2} with evidence{mean}")
-    mis = [i for i in m.ids() if (last := m.recall(i).last) and last.flag == "mis"]
-    if mis:
-        print("misconceptions shown in the last answer:")
-        for i in mis:
-            print(f"  {i}  {short(m.name(i), 30)}  {short(m.recall(i).last.note, 80)}")
-    if m.answers:
-        last = max(m.answers, key=lambda x: x.at)
-        print(f"last answer: {last.at:%Y-%m-%d %H:%M} ({last.ask})")
-    warn(m)
-
-
-# -- commands: adding, amending and deleting propositions and chains
-
-def split_list(s: str | None) -> tuple[str, ...]:
-    return tuple(x.strip() for x in (s or "").split(",") if x.strip())
-
-
-def check_prop(ctx: Context, p: Prop, force: bool):
-    """Die unless p is a well-formed proposition whose name no other one has."""
-    for text in (p.name, p.statement, *p.topics, *p.aliases, p.vault or ""):
-        if SEP.strip() in text or "\n" in text:
-            die("fields may not contain ` · ` or newlines")
-    if not p.name.strip() or not p.statement.strip():
-        die("a proposition needs a name and a statement")
-    clash = [q for q in ctx.model.props.values() if norm(q.name) == norm(p.name) and q.id != p.id]
-    if clash and not force:
-        die(f"{clash[0].id} already has this name: {clash[0].statement} (--force to add anyway)")
-    if p.vault and ctx.vault and p.vault not in ctx.vault:
-        die(f"no vault note {p.vault}")
-
-
-def check_chain(ctx: Context, text: str, step: str, iid: str = "") -> tuple[tuple[str, ...], str]:
-    """Resolve `p_a p_b => p_c` (ids or names) to premises and conclusion, or die."""
-    m = ctx.model
-    parsed = parse_chain(text, names=True)
-    if not parsed:
-        die("want: p_a p_b => p_c (ids or names)")
-
-    def resolve(x):
-        if re.fullmatch(ID, x):
-            return x
-        hits = [p.id for p in m.props.values() if norm(p.name) == norm(x)]
-        if len(hits) != 1:
-            die(f"`{x}` names {len(hits)} propositions; use an id")
-        return hits[0]
-
-    premises, conclusion = tuple(map(resolve, parsed[0])), resolve(parsed[1])
-    for pid in (*premises, conclusion):
-        if pid not in m.props:
-            die(f"no proposition {pid}")
-    if conclusion in premises:
-        die("a conclusion cannot be its own premise")
-    for c in m.chains.values():
-        if c.id != iid and (sorted(c.premises), c.conclusion) == (sorted(premises), conclusion):
-            die(f"{c.id} is already this chain")
-    if not step.strip() or SEP.strip() in step or "\n" in step:
-        die("a step is required and may not contain ` · ` or newlines")
-    return premises, conclusion
-
-
-def cmd_new_prop(ctx: Context, a):
-    p = Prop(new_id("p_", set(ctx.model.ids())), a.name, a.statement, split_list(a.topics),
-             split_list(a.aliases), a.vault)
-    check_prop(ctx, p, a.force)
-    ctx.store.add_prop(p)
-    print(p.id)
-
-
-def cmd_new_chain(ctx: Context, a):
-    premises, conclusion = check_chain(ctx, " ".join(a.chain), a.step)
-    c = Chain(new_id("c_", set(ctx.model.ids())), premises, conclusion, a.step)
-    ctx.store.add_chain(c)
-    print(c.id)
-
-
-def cmd_amend(ctx: Context, a):
-    m = ctx.model
-    if a.id in m.props:
-        if a.chain is not None or a.step is not None:
-            die(f"{a.id} is a proposition: amend --name, --statement, --topics, --aliases, --vault")
-        old = m.props[a.id]
-        new = Prop(old.id, old.name if a.name is None else a.name,
-                   old.statement if a.statement is None else a.statement,
-                   old.topics if a.topics is None else split_list(a.topics),
-                   old.aliases if a.aliases is None else split_list(a.aliases),
-                   old.vault if a.vault is None else (a.vault or None))
-        check_prop(ctx, new, a.force)
-        claim_changed = new.statement != old.statement
-    elif a.id in m.chains:
-        if any(x is not None for x in (a.name, a.statement, a.topics, a.aliases, a.vault)):
-            die(f"{a.id} is a chain: amend --chain 'p_a p_b => p_c' or --step")
-        old = m.chains[a.id]
-        step = old.step if a.step is None else a.step
-        text = a.chain if a.chain is not None else f"{' '.join(old.premises)} => {old.conclusion}"
-        premises, conclusion = check_chain(ctx, text, step, old.id)
-        new = Chain(old.id, premises, conclusion, step)
-        claim_changed = (set(new.premises), new.conclusion, new.step) != \
-                        (set(old.premises), old.conclusion, old.step)
-    else:
-        die(f"no proposition or chain {a.id}")
-    if new == old:
+    targets = terms_of([a.names])
+    ids = []
+    for t in targets:
+        j = m.resolve(t)
+        if j is None:
+            near = m.nearest(t, 1)
+            die(f"no idea `{t}`" + (f" (nearest: {m.ideas[near[0]].name})" if near else ""))
+        ids.append(j)
+    statement = " ".join(stdin_text(required=False).split())
+    if len(ids) > 1 and (a.name or statement):
+        die("a new name or statement is for one idea at a time")
+    problems: list[str] = []
+    if a.area is not None:
+        area = a.area.strip("/")
+        if not re.fullmatch(AREA, area):
+            die(f"`{area}` is not an area path (e.g. maths/analysis)")
+        if area not in m.areas and not a.new_area:
+            die(f"no area {area} (--new-area makes it)")
+    changed: dict[str, Idea] = {}
+    for j in ids:
+        old = m.ideas[j]
+        new = old
+        if a.name:
+            if not re.fullmatch(NAME, a.name):
+                problems.append(f"name `{a.name}` is not kebab-case")
+            elif a.name in m.by_name and m.by_name[a.name] != j:
+                problems.append(f"the name {a.name} is taken by {m.by_name[a.name]}")
+            new = replace(new, name=a.name)
+        if a.kind:
+            if a.kind not in IDEA_KINDS:
+                problems.append("kind is definition, result, proof or method")
+            new = replace(new, kind=a.kind)
+        if a.area is not None:
+            new = replace(new, area=a.area.strip("/"))
+        if statement:
+            new = replace(new, statement=statement)
+        if a.needs:
+            needs, bad = edit_list(m, new.needs, a.needs)
+            problems += bad
+            new = replace(new, needs=needs)
+        if a.uses:
+            uses, bad = edit_list(m, new.uses, a.uses)
+            problems += bad
+            new = replace(new, uses=uses)
+        if a.aliases is not None:
+            new = replace(new, aliases=tuple(x.strip() for x in a.aliases.split(",") if x.strip()))
+        if a.vault is not None:
+            if a.vault and ctx.vault and a.vault not in ctx.vault:
+                problems.append(f"no vault note {a.vault}")
+            new = replace(new, vault=a.vault or None)
+        if old.name in (*new.needs, *new.uses) or (a.name and a.name in (*new.needs, *new.uses)):
+            problems.append(f"{old.name} cannot need or use itself")
+        if new != old:
+            changed[j] = new
+    if not changed and not problems:
         die("nothing to change")
-    n = len(m.answers_for(a.id))
-    if claim_changed and n and not a.force:
-        die(f"{a.id} has {n} answer(s), given to the claim as it reads now. Fix its wording "
-            f"with --force; if the claim itself is different, add a new id and delete this one")
-    ctx.store.replace(new)
-    print(f"{a.id} amended")
+    if a.name and ids[0] in changed:  # a rename rewrites the edges that name the idea
+        old_name = m.ideas[ids[0]].name
+        for i in m.ideas.values():
+            cur = changed.get(i.id, i)
+            if old_name in (*cur.needs, *cur.uses):
+                changed[i.id] = replace(cur, needs=tuple(a.name if x == old_name else x
+                                                         for x in cur.needs),
+                                        uses=tuple(a.name if x == old_name else x for x in cur.uses))
+    if not problems:
+        problems += [f"cycle: {c}" for c in check_cycles(m, list(changed.values()))]
+    if problems:
+        die("nothing changed:\n  " + "\n  ".join(problems))
+    if a.area is not None and a.area.strip("/") not in m.areas:
+        ctx.store.make_area(a.area.strip("/"))
+    ctx.store.write_ideas(list(changed.values()), m.ideas)
+    for j in ids:
+        i = changed.get(j, m.ideas[j])
+        print(f"{j} {i.name} edited" + (f" → {i.area}" if a.area is not None else ""))
+    others = [i for i in changed if i not in ids]
+    if others:
+        print(f"renamed in the edges of {len(others)} other idea(s)")
 
 
-def cmd_delete(ctx: Context, a):
+def cmd_rm(ctx: Context, a):
     m = ctx.model
-    if not m.exists(a.id):
-        die(f"no proposition or chain {a.id}")
-    used = [c.id for c in m.chains.values() if a.id in (*c.premises, c.conclusion)]
-    if used:
-        die(f"chains rest on {a.id}: {', '.join(used)}; delete or amend them first")
-    n = len(m.answers_for(a.id))
-    if n and not a.force:
-        die(f"{a.id} has {n} answer(s); --force deletes it and moves them to archive.md")
-    moved = ctx.store.remove(a.id, ctx.cfg.today, a.why or "")
-    print(f"{a.id} deleted" + (f"; {len(moved)} answer(s) moved to archive.md" if moved else ""))
+    j = m.resolve(a.name)
+    if j is None:
+        die(f"no idea `{a.name}`")
+    if not (a.why or "").strip():
+        die("say why with --why; its answers move to archive.md with the reason")
+    users = sorted({m.name(x) for x in (*m.needed_by.get(j, []), *m.used_by.get(j, []))})
+    if users:
+        die(f"{m.name(j)} is needed or used by {', '.join(users)}; edit their edges first")
+    moved = ctx.store.remove_idea(m.ideas[j], m.ideas, ctx.cfg.today, a.why)
+    print(f"{j} {m.name(j)} removed" + (f"; {len(moved)} answer(s) moved to archive.md"
+                                        if moved else ""))
 
 
 # -- commands: asking and recording
 
 def cmd_ask(ctx: Context, a):
     m = ctx.model
-    text = open(a.file).read() if a.file else sys.stdin.read()
+    text = open(a.file).read() if a.file else stdin_text(required=True)
     title, items, problems = questions.parse_block(text)
     if not items:
         problems.append("no items")
-    problems += [f"item {it['n']}: unknown id {it['id']} (add it with `reader new`)"
-                 for it in items if not m.exists(it["id"])]
+    for it in items:
+        j = m.resolve(it["id"])
+        if j is None:
+            problems.append(f"item {it['n']}: unknown idea {it['id']} (add it with `reader add`)")
+        else:
+            it["id"], it["name"] = j, m.ideas[j].name
     if problems:
         die("question block not stored:\n  " + "\n  ".join(problems))
     ask = questions.new_block(new_id("q_", ctx.store.ask_ids()), title, items, ctx.cfg.now)
@@ -360,96 +494,124 @@ def open_ask(ctx: Context, qid: str) -> dict:
     return ask
 
 
+def item_grade(spec: str, ask: dict) -> tuple[int, str]:
+    n, _, grade = spec.partition("=")
+    if not n.isdigit() or not 0 < int(n) <= len(ask["items"]):
+        die(f"`{spec}`: want <item>=<grade>, e.g. 3=good")
+    if grade not in GRADES:
+        die(f"`{spec}`: the grade is again, hard, good or easy")
+    return int(n), grade
+
+
 def cmd_answer(ctx: Context, a):
     ask = open_ask(ctx, a.ask)
-    g = questions.grade_reply(ask, " ".join(a.reply), ctx.cfg.now, a.redo)
-    if not g.shown:
-        die("could not read the reply; entries look like `1b8 2. 3- 4?` or `5: …`")
-    for answer in g.answers:
-        ctx.store.record(answer)
+    reply = " ".join(a.reply)
+    if not (reply or a.say or a.regrade or a.retract):
+        die("pass the reply, or --say, --regrade or --retract")
+    shown, recorded, waiting = [], 0, []
+    if a.retract:
+        if not (a.why or "").strip():
+            die("say why with --why, e.g. 'misread the question' or 'misclick: meant 1a7'")
+        for n in a.retract:
+            if not 0 < n <= len(ask["items"]):
+                die(f"no item {n}")
+            if not ctx.store.take_answer(ask["id"], n, ctx.cfg.today, "retracted: " + a.why):
+                die(f"item {n} of {ask['id']} has no recorded answer")
+            it = ask["items"][n - 1]
+            it["state"] = "open"
+            it.setdefault("replies", []).append(
+                {"at": ctx.cfg.now.isoformat(timespec="seconds"), "token": "retracted",
+                 "thoughts": a.why})
+            shown.append(f"- **{n}** retracted; its answer moved to archive.md, and the item "
+                         f"is open again")
+    if reply:
+        g = questions.grade_reply(ask, reply, ctx.cfg.now, a.redo)
+        if not g.shown:
+            die("could not read the reply; entries look like `1b8 2. 3- 4?` or `5: …`")
+        for answer in g.answers:
+            ctx.store.record(answer)
+        shown += g.shown
+        recorded += len(g.answers)
+        waiting += g.to_grade
+    grades = [(item_grade(s, ask), "say") for s in a.say or []] + \
+             [(item_grade(s, ask), "regrade") for s in a.regrade or []]
+    if a.mis and len(grades) != 1:
+        die("--mis goes with exactly one --say or --regrade")
+    for (n, grade), how in grades:
+        it = ask["items"][n - 1]
+        if it["state"] == "open":
+            die(f"item {n} has no answer yet; pass their reply first")
+        if how == "say" and it["kind"] != "say":
+            die(f"item {n} is a {it['kind']}; --regrade changes its grade")
+        if a.mis and grade != "again":
+            die("a misconception is graded again")
+        ctx.store.record(questions.grade_say(ask, n, grade, ctx.cfg.now, a.mis, a.note))
+        shown.append(f"- **{n}** graded {grade}")
+        recorded += 1
+        waiting = [w for w in waiting if w != n]
     ctx.store.save_ask(ask)
-    print("\n".join(g.shown))
-    notes = [f"grade {n}: reader grade {ask['id']} {n} good|hard|again [--mis 'believed X → Y']"
-             for n in g.to_grade]
-    if g.answers:
-        notes.append(f"{len(g.answers)} answer(s) recorded")
+    print("\n".join(shown))
+    notes = [f"grade {n}: reader answer {ask['id']} --say {n}=good|hard|again "
+             f"[--mis 'believed X → Y']" for n in waiting]
+    if recorded:
+        notes.append(f"{recorded} answer(s) recorded")
     if notes:
         print("\n<!-- for the agent: " + "; ".join(notes) + " -->")
 
 
-def cmd_grade(ctx: Context, a):
-    ask = open_ask(ctx, a.ask)
-    if not 0 < a.n <= len(ask["items"]):
-        die(f"no item {a.n}")
-    if a.grade not in GRADES:
-        die("grade is again, hard, good or easy")
-    if ask["items"][a.n - 1]["state"] == "open":
-        die(f"item {a.n} has no answer yet; pass their reply to `reader answer {ask['id']}`")
-    if a.mis and a.grade != "again":
-        die("a misconception is graded again")
-    ctx.store.record(questions.grade_say(ask, a.n, a.grade, ctx.cfg.now, a.mis, a.note))
-    ctx.store.save_ask(ask)
-    print(f"{a.n} graded {a.grade}, recorded")
-
-
-def cmd_retract(ctx: Context, a):
-    ask = open_ask(ctx, a.ask)
-    if not 0 < a.n <= len(ask["items"]):
-        die(f"no item {a.n}")
-    if not (a.why or "").strip():
-        die("say why with --why, e.g. 'misread the question' or 'misclick: meant 1a7'")
-    moved = ctx.store.take_answer(ask["id"], a.n, ctx.cfg.today, "retracted: " + a.why)
-    if not moved:
-        die(f"item {a.n} of {ask['id']} has no recorded answer")
-    it = ask["items"][a.n - 1]
-    it["state"] = "open"
-    it.setdefault("replies", []).append(
-        {"at": ctx.cfg.now.isoformat(timespec="seconds"), "token": "retracted", "thoughts": a.why})
-    ctx.store.save_ask(ask)
-    print(f"{ask['id']}/{a.n} retracted; its answer moved to archive.md. The item is open "
-          f"again: pass a new reply with `reader answer {ask['id']} \"{a.n}…\"`, or ask a new item")
+def cmd_observed(ctx: Context, a):
+    m = ctx.model
+    pairs = []
+    for spec in a.ideas:
+        name, _, grade = spec.rpartition("=")
+        j = m.resolve(name)
+        if j is None:
+            die(f"no idea `{name}` (add it with `reader add`)")
+        if grade not in ("again", "hard", "good"):
+            die(f"`{spec}`: observed work is graded good, hard or again")
+        pairs.append((j, grade))
+    notes: dict[str, str] = {}
+    common = ""
+    for note in a.note or []:
+        head, sep, rest = note.partition(":")
+        j = m.resolve(head.strip()) if sep else None
+        if j is not None:
+            notes[j] = rest.strip()
+        else:
+            common = (common + " " + note).strip()
+    qid = new_id("q_", ctx.store.ask_ids())
+    items = [{"n": k, "kind": "observed", "id": j, "name": m.ideas[j].name, "depth": "use",
+              "q": a.step, "options": [], "why": "", "ref": "", "state": "done"}
+             for k, (j, _g) in enumerate(pairs, 1)]
+    ctx.store.save_ask({"id": qid, "title": f"observed · {a.step}",
+                        "asked": ctx.cfg.now.isoformat(timespec="seconds"), "observed": True,
+                        "items": items})
+    for k, (j, grade) in enumerate(pairs, 1):
+        note = "observed: " + (notes.get(j) or common or "verified by the step's tests")
+        ctx.store.record(Answer(ctx.cfg.now, j, "observed", grade, qid, k, depth="use",
+                                note=note))
+    print(f"{len(pairs)} observed answer(s) recorded under {qid}: "
+          + ", ".join(f"{m.name(j)} {g}" for j, g in pairs))
 
 
 # -- commands: upkeep
 
-def cmd_lint(ctx: Context, a):
-    problems = upkeep.lint(ctx.store, ctx.model, ctx.vault)
-    print("\n".join(problems) if problems else
-          f"ok · {len(ctx.model.props)} propositions, {len(ctx.model.chains)} chains, "
-          f"{len(ctx.model.answers)} answers")
-    if problems:
-        sys.exit(1)
-
-
-def cmd_dupes(ctx: Context, a):
-    print("\n".join(upkeep.dupes(ctx.model, a.threshold)) or "no likely duplicates")
-
-
-def cmd_calib(ctx: Context, a):
-    bins = upkeep.calibration(ctx.model)
-    if not bins:
-        print("no picks with confidence yet")
-        return
-    print("conf  n   right  (said)")
-    for c, (n, right) in bins.items():
-        print(f"  {c}  {n:>3}  {right:>5.0%}  ({c}0%)")
-
-
 def cmd_upkeep(ctx: Context, a):
+    if a.check:
+        problems = upkeep.lint(ctx.store, ctx.model, ctx.vault)
+        m = ctx.model
+        print("\n".join(problems) if problems else
+              f"ok · {len(m.ideas)} ideas, {len(m.areas)} areas, {len(m.answers)} answers")
+        if problems:
+            sys.exit(1)
+        return
     print(upkeep.run(ctx.cfg, ctx.store, ctx.model, ctx.vault, a.scout, a.limit, a.timeout))
-
-
-def cmd_scout(ctx: Context, a):
-    try:
-        print(upkeep.scout(ctx.cfg, " ".join(a.task), a.timeout))
-    except RuntimeError as e:
-        die(str(e))
 
 
 # --------------------------------------------------------------------------
 
 def parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="reader", description=__doc__.split("\n\n")[0])
+    ap = argparse.ArgumentParser(prog="reader", description=(__doc__ or "").split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def add(name, fn, help_):
@@ -459,95 +621,78 @@ def parser() -> argparse.ArgumentParser:
 
     add("init", cmd_init, "create the model folder, its profile and its git repo")
     add("profile", cmd_profile, "who the reader is")
-    sp = add("check", cmd_check, "look ideas up: each with what it rests on, what rests on it, "
-             "and R per id (ids or terms, comma-separated; #topic)")
-    sp.add_argument("terms", nargs="+")
-    sp.add_argument("--depth", type=int, default=2, help="levels of premises (default 2)")
-    sp.add_argument("--all", action="store_true", help="no limit on matches")
-    sp = add("graph", cmd_graph, "draw the model (or the neighbourhood of some terms) as an "
-             "interactive graph in the browser")
-    sp.add_argument("terms", nargs="*")
-    sp.add_argument("--depth", type=int, default=2, help="levels of premises (default 2)")
+    sp = add("context", cmd_context, "look up an area, ideas or terms (comma-separated); "
+             "no argument: the top of the area tree")
+    sp.add_argument("what", nargs="*")
+    sp.add_argument("--answers", action="store_true", help="every answer, with its question")
+    sp = add("graph", cmd_graph, "draw the model (or the neighbourhood of some ideas or an area) "
+             "as an interactive graph in the browser")
+    sp.add_argument("what", nargs="*")
+    sp.add_argument("--depth", type=int, default=2, help="steps along edges (default 2)")
     sp.add_argument("--out", help="write a static page here instead of serving it (no refresh)")
     sp.add_argument("--port", type=int, default=0, help="port to serve on (default: any free)")
     sp.add_argument("--no-open", action="store_true", help="do not open a browser")
-    sp = add("find", cmd_find, "existing propositions and vault notes for some terms")
-    sp.add_argument("terms", nargs="+")
-    sp.add_argument("--limit", type=int, default=8)
-    sp = add("show", cmd_show, "one proposition or chain with every answer and its question")
-    sp.add_argument("id")
-    add("status", cmd_status, "the whole model in a few lines")
 
-    sp = add("new", None, "add a proposition or a chain")
-    nsub = sp.add_subparsers(dest="what", required=True)
-    np_ = nsub.add_parser("prop", help="add a proposition; prints its id")
-    np_.add_argument("name")
-    np_.add_argument("statement")
-    np_.add_argument("--topics")
-    np_.add_argument("--vault")
-    np_.add_argument("--aliases")
-    np_.add_argument("--force", action="store_true")
-    np_.set_defaults(fn=cmd_new_prop)
-    nc = nsub.add_parser("chain", help="add a chain: p_a p_b => p_c --step '…'; prints its id")
-    nc.add_argument("chain", nargs="+")
-    nc.add_argument("--step", required=True)
-    nc.set_defaults(fn=cmd_new_chain)
-    sp = add("amend", cmd_amend, "fix a proposition or chain in place; its id and answers stay "
-             "(a different claim is a new id)")
-    sp.add_argument("id")
-    sp.add_argument("--name")
-    sp.add_argument("--statement")
-    sp.add_argument("--topics", help="replaces the topics; '' clears them")
+    sp = add("add", cmd_add, "add ideas from stdin: `## name · kind · area`, the statement, "
+             "then `- needs: …`, `- uses: …`, `- aliases: …`, `- vault: …`; prints their ids")
+    sp.add_argument("--anyway", action="store_true", help="add despite a likely duplicate")
+    sp.add_argument("--new-area", action="store_true", help="make an area that does not exist")
+    sp = add("edit", cmd_edit, "change ideas (comma-separated names); a new statement on stdin")
+    sp.add_argument("names")
+    sp.add_argument("--name", help="rename it; the edges that name it follow")
+    sp.add_argument("--kind")
+    sp.add_argument("--area", help="move it (them) to this area")
+    sp.add_argument("--new-area", action="store_true", help="make the area if it does not exist")
+    sp.add_argument("--needs", help="+name to add an edge, -name to remove one; comma-separated")
+    sp.add_argument("--uses", help="+name to add an edge, -name to remove one; comma-separated")
     sp.add_argument("--aliases", help="replaces the aliases; '' clears them")
     sp.add_argument("--vault", help="'' clears it")
-    sp.add_argument("--chain", help="a chain's new premises and conclusion: 'p_a p_b => p_c'")
-    sp.add_argument("--step")
-    sp.add_argument("--force", action="store_true",
-                    help="change the claim of an id with answers, or reuse a name")
-    sp = add("delete", cmd_delete, "delete a proposition or chain nothing rests on; its answers "
-             "move to archive.md")
-    sp.add_argument("id")
-    sp.add_argument("--why", help="a note kept with the archived answers")
-    sp.add_argument("--force", action="store_true", help="delete it even though it has answers")
+    sp = add("rm", cmd_rm, "remove an idea nothing needs or uses; its answers move to archive.md")
+    sp.add_argument("name")
+    sp.add_argument("--why", help="kept with the archived answers")
 
     sp = add("ask", cmd_ask, "store a question block (file or stdin), print it shuffled with its id")
     sp.add_argument("file", nargs="?")
-    sp = add("answer", cmd_answer, "grade the reader's one-line reply to a block and record it now")
+    sp = add("answer", cmd_answer, "grade the reader's one-line reply to a block and record it "
+             "now; also grade say items, regrade, retract")
     sp.add_argument("ask", help="the block id, q_…")
-    sp.add_argument("reply", nargs="+")
+    sp.add_argument("reply", nargs="*")
     sp.add_argument("--redo", action="store_true",
                     help="answer an item again; the old answer moves to archive.md")
-    sp = add("grade", cmd_grade, "grade a say item (or regrade any answered item) and record it now")
-    sp.add_argument("ask", help="the block id, q_…")
-    sp.add_argument("n", type=int)
-    sp.add_argument("grade")
-    sp.add_argument("--mis", help="the misconception the answer shows: 'believed X → Y'")
-    sp.add_argument("--note")
-    sp = add("retract", cmd_retract, "set an answer aside (misread question, misclick): it moves "
-             "to archive.md and the item opens again")
-    sp.add_argument("ask", help="the block id, q_…")
-    sp.add_argument("n", type=int)
-    sp.add_argument("--why", required=True, help="why the answer does not count")
+    sp.add_argument("--say", action="append", metavar="N=GRADE", help="grade a say item")
+    sp.add_argument("--regrade", action="append", metavar="N=GRADE",
+                    help="change the grade of an answered item")
+    sp.add_argument("--mis", help="the misconception it shows: 'believed X → Y' (grade again)")
+    sp.add_argument("--note", help="a note for --say or --regrade")
+    sp.add_argument("--retract", action="append", type=int, metavar="N",
+                    help="set an answer aside (misread, misclick); the item opens again")
+    sp.add_argument("--why", help="why a retracted answer does not count")
+    sp = add("observed", cmd_observed, "record a step of verified pairing work: "
+             "name=good|hard|again for each idea it exercised")
+    sp.add_argument("ideas", nargs="+", metavar="NAME=GRADE")
+    sp.add_argument("--step", required=True, help="the step, e.g. '3 · causal head'")
+    sp.add_argument("--note", action="append",
+                    help="what was observed; 'name: …' for one idea, else for all")
 
-    add("calib", cmd_calib, "how often the reader's confidence digits are right")
-    sp = add("dupes", cmd_dupes, "likely duplicate propositions")
-    sp.add_argument("--threshold", type=float, default=0.85)
-    add("lint", cmd_lint, "check that every file parses and every id and answer resolves")
-    sp = add("upkeep", cmd_upkeep, "daily: lint, back up, duplicates, notes without propositions")
-    sp.add_argument("--scout", action="store_true", help="draft propositions with the scout")
+    sp = add("upkeep", cmd_upkeep, "daily: check, back up, duplicates, areas to split, "
+             "calibration, vault notes without ideas")
+    sp.add_argument("--check", action="store_true",
+                    help="only check that every file parses and every name, id and answer "
+                         "resolves (exit 1 on problems)")
+    sp.add_argument("--scout", action="store_true", help="draft ideas for vault notes")
     sp.add_argument("--limit", type=int, default=5)
     sp.add_argument("--timeout", type=int, default=600)
-    sp = add("scout", cmd_scout, "ask a cheap read-only model to search the vault")
-    sp.add_argument("task", nargs="+")
-    sp.add_argument("--timeout", type=int, default=900)
     return ap
 
 
 def main(argv: list[str] | None = None):
     ap = parser()
-    a = ap.parse_args(argv)
-    if a.fn is None:
-        ap.parse_args([a.cmd, "-h"])
+    args = list(sys.argv[1:] if argv is None else argv)
+    # `--needs -x` removes an edge; argparse would read `-x` as an option
+    for k in range(len(args) - 1, 0, -1):
+        if args[k - 1] in ("--needs", "--uses") and args[k].startswith("-"):
+            args[k - 1:k + 1] = [f"{args[k - 1]}={args[k]}"]
+    a = ap.parse_args(args)
     a.fn(Context(), a)
 
 

@@ -82,7 +82,8 @@
   <span class="dot" style="background:var(--unknown)"></span><span>never asked</span>
   <span class="dot" style="border:2px solid var(--critical)"></span><span>last answer a misconception</span>
   <span class="dot" style="border:2px solid var(--ink)"></span><span>looked up</span>
-  <span style="color:var(--muted);text-align:center">&gt;–</span><span>chain: premises → conclusion</span>
+  <svg width="22" height="8"><line x1="1" y1="4" x2="21" y2="4" stroke="var(--muted)" stroke-width="1.5"/></svg><span>needs: above it, it cannot be followed without</span>
+  <svg width="22" height="8"><line x1="1" y1="4" x2="21" y2="4" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="3 2"/></svg><span>uses only: doing it carries it out</span>
 </div>
 <aside id="panel"><button class="close" id="close">×</button><div id="body"></div></aside>
 
@@ -151,84 +152,75 @@ const fmtR = r => r == null ? "–" : r >= 1 ? "1" : (Math.floor(r * 100) / 100)
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const idOf = x => typeof x === "object" ? x.id : x;
 
-// chains each node takes part in, and the members of each chain
-const chainsOf = {}, members = {};
-for (const [cid, c] of Object.entries(DATA.chains)) {
-  members[cid] = new Set([...c.premises, c.conclusion, cid]);
-  for (const id of members[cid]) (chainsOf[id] ??= new Set()).add(cid);
+// links run from the idea needed or used to the idea that needs or uses it, so
+// what an idea rests on sits above it
+const ideas = Object.fromEntries(DATA.nodes.map(n => [n.id, n]));
+const nbrs = {};
+for (const l of DATA.links) {
+  (nbrs[l.source] ??= new Set()).add(l.target); (nbrs[l.target] ??= new Set()).add(l.source);
 }
-const degree = id => (chainsOf[id]?.size ?? 0);
-const props = Object.fromEntries(DATA.nodes.filter(n => !n.knot).map(n => [n.id, n]));
+const degree = id => (nbrs[id]?.size ?? 0);
+const markOf = l => l.needs && l.uses ? "needs and uses" : l.needs ? "needs" : "uses";
 
 let lit = null;      // ids lit by hover or search; null: everything
-let litChains = null;
 let selected = null;
 
 function light(ids) {
-  if (!ids || !ids.size) { lit = litChains = null; return; }
-  lit = new Set(ids); litChains = new Set();
-  for (const id of ids) for (const cid of chainsOf[id] ?? []) {
-    litChains.add(cid); for (const m of members[cid]) lit.add(m);
-  }
+  if (!ids || !ids.size) { lit = null; return; }
+  lit = new Set(ids);
+  for (const id of ids) for (const m of nbrs[id] ?? []) lit.add(m);
 }
 const dim = id => lit && !lit.has(id);
+const litLink = l => lit && lit.has(idOf(l.source)) && lit.has(idOf(l.target));
 
 const el = document.getElementById("graph");
 const G = window.G = ForceGraph()(el)
   .backgroundColor(C("--surface"))
   .nodeId("id")
   .nodeRelSize(3.2)
-  .nodeVal(n => n.knot ? 0.05 : 1 + 1.5 * degree(n.id))
-  .nodeLabel(n => n.knot
-      ? `<b>${esc(DATA.chains[n.chain].name)}</b><br>${esc(DATA.chains[n.chain].step)}`
-      : `<b>${esc(n.name)}</b> · R ${fmtR(n.r)}`)
-  .linkLabel(l => `<b>${esc(DATA.chains[l.chain].name)}</b><br>${esc(DATA.chains[l.chain].step)}`
-      + ` · R ${fmtR(DATA.chains[l.chain].r)}`)
-  .linkColor(l => {
-    const c = DATA.chains[l.chain];
-    const a = litChains && !litChains.has(l.chain) ? 0.05 : litChains ? 0.75 : 0.28;
-    return c.r == null ? `rgba(${T.link},${a})` : hexA(colourOf(c.r), a + 0.15);
-  })
-  .linkWidth(l => litChains?.has(l.chain) ? 1.6 : 1)
-  .linkDirectionalArrowLength(l => l.arrow ? 3.5 : 0)
+  .nodeVal(n => 1 + 1.5 * degree(n.id))
+  .nodeLabel(n => `<b>${esc(n.name)}</b> · ${esc(n.kind)} · R ${fmtR(n.r)}`)
+  .linkLabel(l => `<b>${esc(ideas[idOf(l.target)]?.name)}</b> ${markOf(l)} <b>${esc(ideas[idOf(l.source)]?.name)}</b>`)
+  .linkColor(l => `rgba(${T.link},${lit ? (litLink(l) ? 0.8 : 0.05) : 0.32})`)
+  .linkWidth(l => (l.needs && l.uses ? 1.6 : 1) * (litLink(l) ? 1.5 : 1))
+  .linkLineDash(l => l.needs ? null : [3, 2])
+  .linkDirectionalArrowLength(3.5)
   .linkDirectionalArrowRelPos(1)
   .nodeCanvasObject(draw)
   .nodePointerAreaPaint((n, colour, ctx) => {
     ctx.fillStyle = colour; ctx.beginPath();
-    ctx.arc(n.x, n.y, (n.knot ? 3 : radius(n) + 2), 0, 2 * Math.PI); ctx.fill();
+    ctx.arc(n.x, n.y, radius(n) + 2, 0, 2 * Math.PI); ctx.fill();
   })
   .onNodeHover(n => { if (!q.value) light(n ? new Set([n.id]) : null); el.style.cursor = n ? "pointer" : null; })
-  .onLinkHover(l => { if (!q.value) { lit = l ? new Set(members[l.chain]) : null; litChains = l ? new Set([l.chain]) : null; } })
-  .onNodeClick(n => open(n.knot ? n.chain : n.id))
-  .onLinkClick(l => open(l.chain))
+  .onLinkHover(l => { if (!q.value) lit = l ? new Set([idOf(l.source), idOf(l.target)]) : null; })
+  .onNodeClick(n => open(n.id))
+  .onLinkClick(l => open(idOf(l.target)))
   .onBackgroundClick(() => close())
   .cooldownTicks(300)
   .autoPauseRedraw(false)  // search, theme and hover change the drawing after the layout settles
   .onEngineStop(() => { if (!G._fitted) { G._fitted = true; G.zoomToFit(400, 60);
     setTimeout(() => { if (G.zoom() > 2.5) G.zoom(2.5, 300); }, 420); } });  // small views stay small
 
-G.d3Force("charge").strength(n => n.knot ? -8 : -70);
+G.d3Force("charge").strength(-70);
 // a gentle pull to the centre, as in Obsidian, so unconnected ideas stay near
 G.d3Force("gravity", (() => { let ns = []; const f = alpha => {
   for (const n of ns) { n.vx -= n.x * 0.04 * alpha; n.vy -= n.y * 0.04 * alpha; } };
   f.initialize = nodes => { ns = nodes; }; return f; })());
-// implications flow down the page. Each proposition gets a depth, the longest
-// chain path into it (a premise with no premises of its own sits just above its
-// nearest conclusion), and is pulled gently to that row; each link also nudges
+// what an idea rests on sits above it. Each idea gets a depth, the longest path
+// of edges into it (an idea that rests on nothing sits just above the nearest
+// idea resting on it), and is pulled gently to that row; each link also nudges
 // its target below its source. All soft, so a cycle stays a tangle instead of
 // breaking the layout.
 const depth = (() => {
-  const d = {}, cs = Object.values(DATA.chains), n = Object.keys(props).length;
-  for (const c of cs) for (const id of [...c.premises, c.conclusion]) d[id] ??= 0;
+  const d = {}, ls = DATA.links, n = DATA.nodes.length;
+  for (const l of ls) { d[l.source] ??= 0; d[l.target] ??= 0; }
   for (let i = 0, moved = true; moved && i < n; i++) {
     moved = false;
-    for (const c of cs) { const want = 1 + Math.max(...c.premises.map(p => d[p]));
-      if (d[c.conclusion] < want) { d[c.conclusion] = want; moved = true; } }
+    for (const l of ls) if (d[l.target] < d[l.source] + 1) { d[l.target] = d[l.source] + 1; moved = true; }
   }
-  for (const c of cs) for (const p of c.premises)
-    if (!cs.some(k => k.conclusion === p))
-      d[p] = Math.max(d[p], Math.min(...cs.filter(k => k.premises.includes(p)).map(k => d[k.conclusion])) - 1);
-  for (const [cid, c] of Object.entries(DATA.chains)) d[cid] = d[c.conclusion] - 0.45;
+  for (const id of Object.keys(d))
+    if (!ls.some(l => l.target === id))
+      d[id] = Math.max(d[id], Math.min(...ls.filter(l => l.source === id).map(l => d[l.target])) - 1);
   return d;
 })();
 // rows are relative to each connected component, so components keep apart
@@ -236,8 +228,8 @@ const comp = {};
 for (const id of Object.keys(depth)) {
   if (id in comp) continue;
   const stack = [id]; comp[id] = id;
-  while (stack.length) for (const cid of chainsOf[stack.pop()] ?? [])
-    for (const m of members[cid]) if (!(m in comp)) { comp[m] = id; stack.push(m); }
+  while (stack.length) for (const m of nbrs[stack.pop()] ?? [])
+    if (!(m in comp)) { comp[m] = id; stack.push(m); }
 }
 const ROW = 42;
 // each component starts in its own place, biggest in the middle, already in
@@ -269,11 +261,11 @@ G.d3Force("flow", alpha => {
   for (const l of G.graphData().links) {
     const s = l.source, t = l.target;
     if (typeof s !== "object") continue;  // not yet resolved by the link force
-    const short = (l.arrow ? 34 : 16) - (t.y - s.y);
+    const short = 34 - (t.y - s.y);
     if (short > 0) { const k = short * 0.12 * alpha; t.vy += k; s.vy -= k; }
   }
 });
-G.d3Force("link").distance(l => l.arrow && idOf(l.source) in DATA.chains ? 30 : l.arrow ? 55 : 22);
+G.d3Force("link").distance(55);
 
 function hexA(hex, a) {
   const v = parseInt(hex.slice(1), 16);
@@ -284,12 +276,6 @@ function radius(n) { return Math.sqrt(1 + 1.5 * degree(n.id)) * 3.2; }
 function draw(n, ctx, scale) {
   const faded = dim(n.id);
   ctx.globalAlpha = faded ? 0.12 : 1;
-  if (n.knot) {
-    const c = DATA.chains[n.chain];
-    ctx.fillStyle = c.r == null ? `rgba(${T.link},0.6)` : colourOf(c.r);
-    ctx.beginPath(); ctx.arc(n.x, n.y, 1.3, 0, 2 * Math.PI); ctx.fill();
-    ctx.globalAlpha = 1; return;
-  }
   const r = radius(n);
   ctx.fillStyle = colourOf(n.r);
   ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 2 * Math.PI); ctx.fill();
@@ -314,12 +300,11 @@ function draw(n, ctx, scale) {
 const q = document.getElementById("q");
 function load(at = {}) {
   const keep = document.getElementById("orphans").checked;
-  const nodes = DATA.nodes.filter(n => keep || n.knot || degree(n.id) > 0);
+  const nodes = DATA.nodes.filter(n => keep || degree(n.id) > 0);
   const place = n => at[n.id] ? { ...n, x: at[n.id][0], y: at[n.id][1] }
     : n.id in home ? { ...n, x: home[n.id][0], y: home[n.id][1] } : { ...n };
   G.graphData({ nodes: nodes.map(place), links: DATA.links.map(l => ({ ...l })) });
-  const np = nodes.filter(n => !n.knot).length, nc = Object.keys(DATA.chains).length;
-  document.getElementById("count").textContent = `${np} propositions · ${nc} chains · ${DATA.now}`;
+  document.getElementById("count").textContent = `${nodes.length} ideas · ${DATA.links.length} edges · ${DATA.now}`;
 }
 document.getElementById("orphans").onchange = () => { G._fitted = false; load(); };
 if (KEPT) {
@@ -345,16 +330,16 @@ addEventListener("keydown", e => {
   if (e.key === "r" && !e.metaKey && !e.ctrlKey && !e.altKey && e.target.tagName !== "INPUT") reload();
 });
 
-// -- search lights matches and their chains; Enter centres on the first
-const hay = n => [n.id, n.name, n.statement, ...(n.topics || [])].join(" ").toLowerCase();
+// -- search lights matches and their neighbours; Enter centres on the first
+const hay = n => [n.id, n.name, n.statement, n.area, ...(n.aliases || [])].join(" ").toLowerCase();
 q.oninput = () => {
   const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
-  const hits = words.length ? Object.values(props).filter(n => words.every(w => hay(n).includes(w))) : [];
+  const hits = words.length ? Object.values(ideas).filter(n => words.every(w => hay(n).includes(w))) : [];
   light(words.length ? new Set(hits.map(n => n.id).concat(hits.length ? [] : ["-"])) : null);
 };
 q.onkeydown = e => {
   if (e.key === "Enter" && lit) {
-    const n = G.graphData().nodes.find(n => lit.has(n.id) && !n.knot);
+    const n = G.graphData().nodes.find(n => lit.has(n.id));
     if (n) { G.centerAt(n.x, n.y, 500); G.zoom(3, 500); open(n.id); }
   }
   if (e.key === "Escape") { q.value = ""; light(null); }
@@ -364,7 +349,7 @@ q.onkeydown = e => {
 const panel = document.getElementById("panel"), body = document.getElementById("body");
 document.getElementById("close").onclick = close;
 function close() { selected = null; panel.classList.remove("open"); }
-const link = id => `<a data-id="${id}">${esc(props[id]?.name ?? DATA.chains[id]?.name ?? id)}</a>`;
+const link = id => `<a data-id="${id}">${esc(ideas[id]?.name ?? id)}</a>`;
 body.onclick = e => { const id = e.target.dataset?.id; if (id) open(id, true); };
 
 function answers(list) {
@@ -381,33 +366,28 @@ function stats(x) {
 }
 
 function open(id, centre) {
-  const c = DATA.chains[id], p = props[id];
-  if (!c && !p) return;
+  const p = ideas[id];
+  if (!p) return;
   selected = id;
-  if (p) {
-    const into = [...(chainsOf[id] ?? [])].filter(k => DATA.chains[k].conclusion === id);
-    const out = [...(chainsOf[id] ?? [])].filter(k => DATA.chains[k].premises.includes(id));
-    body.innerHTML = `<h2>${esc(p.name)}</h2><div class="id">${p.id}${p.topics.length ? " · #" + p.topics.map(esc).join(" #") : ""}${p.vault ? " · vault " + esc(p.vault) : ""}</div>
-      ${stats(p)}<div class="statement">${esc(p.statement)}</div>
-      ${into.length ? `<h3>Rests on</h3><ul>${into.map(k => `<li>${DATA.chains[k].premises.map(link).join(" ∧ ")}<br><span class="id">${link(k)} · R ${fmtR(DATA.chains[k].r)}</span></li>`).join("")}</ul>` : ""}
-      ${out.length ? `<h3>Rests on it</h3><ul>${out.map(k => `<li>${link(DATA.chains[k].conclusion)}<br><span class="id">${link(k)} · R ${fmtR(DATA.chains[k].r)}</span></li>`).join("")}</ul>` : ""}
-      <h3>Answers</h3>${answers(p.answers)}`;
-  } else {
-    body.innerHTML = `<h2>${c.premises.map(link).join(" ∧ ")} ⟹ ${link(c.conclusion)}</h2>
-      <div class="id">${c.id} · chain</div>${stats(c)}
-      <div class="statement">${esc(c.step)}</div><h3>Answers</h3>${answers(c.answers)}`;
-  }
+  const edge = l => `<li>${link(l.other)} <span class="id">${markOf(l)} · R ${fmtR(ideas[l.other]?.r)}</span></li>`;
+  const out = DATA.links.filter(l => l.target === id).map(l => ({ ...l, other: l.source }));
+  const inn = DATA.links.filter(l => l.source === id).map(l => ({ ...l, other: l.target }));
+  body.innerHTML = `<h2>${esc(p.name)}</h2><div class="id">${p.id} · ${esc(p.kind)} · ${esc(p.area)}${p.vault ? " · vault " + esc(p.vault) : ""}</div>
+    ${stats(p)}<div class="statement">${esc(p.statement)}</div>
+    ${out.length ? `<h3>Rests on</h3><ul>${out.map(edge).join("")}</ul>` : ""}
+    ${inn.length ? `<h3>Rests on it</h3><ul>${inn.map(edge).join("")}</ul>` : ""}
+    <h3>Answers</h3>${answers(p.answers)}`;
   panel.classList.add("open");
   window.renderMathInElement?.(body, { delimiters: [{ left: "$$", right: "$$", display: true },
     { left: "$", right: "$", display: false }], throwOnError: false });
   if (centre) {
-    const n = G.graphData().nodes.find(n => n.id === id || n.chain === id);
+    const n = G.graphData().nodes.find(n => n.id === id);
     if (n) G.centerAt(n.x, n.y, 500);
   }
 }
 
 // a single lookup opens on its match; a refresh reopens what was open
-const focused = Object.values(props).filter(n => n.focus);
+const focused = Object.values(ideas).filter(n => n.focus);
 if (KEPT) {
   if (KEPT.q) { q.value = KEPT.q; q.oninput(); }
   if (KEPT.selected) setTimeout(() => open(KEPT.selected), 50);
