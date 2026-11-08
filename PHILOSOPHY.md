@@ -549,3 +549,9 @@ Newest last. Add an entry whenever a principle is added, changed or dropped.
   when a task leans on them. Edges: the two agents shared at least one mark on
   136 of 139 edges but disagreed on adding the second on 30, mostly in code
   and ML, so the second mark is noisy; it stays, as data for a later model.
+- **2026-11-08.** The live model migrated to v1. One agent per group of areas
+  filled the table: the 176 propositions became ideas as they were, and of the
+  96 chains, 75 became proof or method ideas (all 32 with answers among them),
+  18 became edges only and 3 were dropped as teaching order. 251 ideas in 19
+  areas, 377 edges, no cycles; all 231 answers kept their idea, 23 now marked
+  observed. The v0 folder stays beside it as `reader-v0`.

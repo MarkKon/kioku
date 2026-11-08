@@ -72,6 +72,7 @@
 <div class="bar">
   <input type="search" id="q" placeholder="Search…" autocomplete="off">
   <label><input type="checkbox" id="orphans" checked> unconnected</label>
+  <label><input type="checkbox" id="shade" checked> areas</label>
   <span class="count" id="count"></span>
   <button id="refresh" title="refresh from the model (r)" hidden>↻</button>
   <button id="theme" title="light / dark">◐</button>
@@ -82,8 +83,9 @@
   <span class="dot" style="background:var(--unknown)"></span><span>never asked</span>
   <span class="dot" style="border:2px solid var(--critical)"></span><span>last answer a misconception</span>
   <span class="dot" style="border:2px solid var(--ink)"></span><span>looked up</span>
-  <svg width="22" height="8"><line x1="1" y1="4" x2="21" y2="4" stroke="var(--muted)" stroke-width="1.5"/></svg><span>needs: above it, it cannot be followed without</span>
-  <svg width="22" height="8"><line x1="1" y1="4" x2="21" y2="4" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="3 2"/></svg><span>uses only: doing it carries it out</span>
+  <svg width="22" height="10"><line x1="1" y1="5" x2="15" y2="5" stroke="var(--muted)" stroke-width="1.5"/><path d="M14 1 L21 5 L14 9 Z" fill="var(--muted)"/></svg><span>needs: the arrow points to the idea that cannot be followed without it</span>
+  <svg width="22" height="10"><line x1="1" y1="5" x2="15" y2="5" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M14 1 L21 5 L14 9 Z" fill="var(--muted)"/></svg><span>uses only: the idea it points to carries it out</span>
+  <span class="dot" style="border-radius:3px;background:var(--hair)"></span><span>shading: an area, and the areas inside it</span>
 </div>
 <aside id="panel"><button class="close" id="close">×</button><div id="body"></div></aside>
 
@@ -129,7 +131,7 @@ function theme() {
   const set = localStorage.getItem("reader-theme");
   if (set) document.documentElement.dataset.theme = set;
   else delete document.documentElement.dataset.theme;
-  const mode = set || (dark.matches ? "dark" : "light");
+  const mode = T.mode = set || (dark.matches ? "dark" : "light");
   const css = getComputedStyle(document.documentElement);
   for (const k of ["surface", "ink", "ink-2", "critical", "unknown", "link"])
     T[k] = css.getPropertyValue("--" + k).trim();
@@ -162,6 +164,56 @@ for (const l of DATA.links) {
 const degree = id => (nbrs[id]?.size ?? 0);
 const markOf = l => l.needs && l.uses ? "needs and uses" : l.needs ? "needs" : "uses";
 
+// -- areas: every area, and each area above it, is a shaded region behind its
+// ideas; nested areas stack, so a subarea reads darker inside its parent
+const chain = a => a.split("/").map((_, i, p) => p.slice(0, i + 1).join("/"));
+const AREAS = [...new Set(DATA.nodes.flatMap(n => chain(n.area)))]
+  .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b));
+const TOPS = [...new Set(AREAS.map(a => a.split("/")[0]))];
+function areaColour(a, alpha, ink) {
+  const h = (25 + 360 * TOPS.indexOf(a.split("/")[0]) / TOPS.length) * Math.PI / 180;
+  const [L, C] = ink ? (T.mode === "dark" ? [.78, .09] : [.48, .1]) : (T.mode === "dark" ? [.62, .08] : [.7, .1]);
+  return hexA(hex([L, C * Math.cos(h), C * Math.sin(h)]), alpha);
+}
+function hull(pts) {  // monotone chain
+  pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const x = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const p of pts) { while (lo.length > 1 && x(lo.at(-2), lo.at(-1), p) <= 0) lo.pop(); lo.push(p); }
+  for (const p of pts.reverse()) { while (up.length > 1 && x(up.at(-2), up.at(-1), p) <= 0) up.pop(); up.push(p); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+const RING = Array.from({ length: 12 }, (_, i) => [Math.cos(i * Math.PI / 6), Math.sin(i * Math.PI / 6)]);
+function shadeAreas(ctx, scale) {
+  if (!document.getElementById("shade").checked) return;
+  const ns = G.graphData().nodes.filter(n => n.x != null);
+  for (const a of AREAS) {
+    const inside = ns.filter(n => n.area === a || n.area.startsWith(a + "/"));
+    if (!inside.length) continue;
+    const level = a.split("/").length - 1, pad = Math.max(10, 30 - 8 * level);
+    const h = hull(inside.flatMap(n => RING.map(([c, s]) => [n.x + pad * c, n.y + pad * s])));
+    ctx.beginPath();  // round the corners through the edge midpoints
+    const mid = i => { const p = h[i % h.length], q = h[(i + 1) % h.length];
+      return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; };
+    ctx.moveTo(...mid(h.length - 1));
+    h.forEach((p, i) => ctx.quadraticCurveTo(p[0], p[1], ...mid(i)));
+    ctx.closePath();
+    ctx.fillStyle = areaColour(a, T.mode === "dark" ? .11 : .10);
+    ctx.fill();
+    // the name sits on the region's top edge; subareas' names fade in with zoom
+    const a2 = level === 0 ? 0.9 : Math.max(0, Math.min(0.9, (scale - 0.7) / 0.6));
+    if (a2 > 0) {
+      const top = h.reduce((m, p) => p[1] < m[1] ? p : m);
+      const xs = h.filter(p => p[1] < top[1] + 4 / scale).map(p => p[0]);
+      ctx.font = `${level === 0 ? 600 : 500} ${(level === 0 ? 13 : 11) / scale}px ui-sans-serif, system-ui, sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      ctx.fillStyle = areaColour(a, a2, true);
+      ctx.fillText(level === 0 ? a : a.split("/").at(-1),
+                   (Math.min(...xs) + Math.max(...xs)) / 2, top[1] - 2 / scale);
+    }
+  }
+}
+
 let lit = null;      // ids lit by hover or search; null: everything
 let selected = null;
 
@@ -184,8 +236,12 @@ const G = window.G = ForceGraph()(el)
   .linkColor(l => `rgba(${T.link},${lit ? (litLink(l) ? 0.8 : 0.05) : 0.32})`)
   .linkWidth(l => (l.needs && l.uses ? 1.6 : 1) * (litLink(l) ? 1.5 : 1))
   .linkLineDash(l => l.needs ? null : [3, 2])
-  .linkDirectionalArrowLength(3.5)
-  .linkDirectionalArrowRelPos(1)
+  .linkDirectionalArrowLength(l => litLink(l) ? 7 : 5.5)
+  .linkDirectionalArrowRelPos(0.55)
+  .linkDirectionalParticles(l => litLink(l) ? 2 : 0)  // lit edges flow toward what rests on them
+  .linkDirectionalParticleWidth(2.5)
+  .linkDirectionalParticleSpeed(0.006)
+  .onRenderFramePre(shadeAreas)
   .nodeCanvasObject(draw)
   .nodePointerAreaPaint((n, colour, ctx) => {
     ctx.fillStyle = colour; ctx.beginPath();
@@ -235,19 +291,59 @@ const ROW = 42;
 // each component starts in its own place, biggest in the middle, already in
 // row order, and is held together loosely: started tangled, a force layout
 // never pulls components apart again
+// Components start near their area: top areas on a circle, their subareas
+// around them, and each component on a small spiral round its area's spot.
+const anchor = (() => {
+  const at = {}, R0 = 230 * Math.sqrt(TOPS.length);
+  TOPS.forEach((t, i) => { const a = 2 * Math.PI * i / TOPS.length;
+    at[t] = [R0 * Math.cos(a), R0 * Math.sin(a)]; });
+  for (const a of AREAS) {
+    if (a in at) continue;
+    const parent = a.slice(0, a.lastIndexOf("/")), sibs = AREAS.filter(b =>
+      b.slice(0, b.lastIndexOf("/")) === parent && b.split("/").length === a.split("/").length);
+    const k = sibs.indexOf(a), ang = 2 * Math.PI * k / sibs.length, r = 110 / (a.split("/").length - 1);
+    at[a] = [at[parent][0] + r * Math.cos(ang), at[parent][1] + r * Math.sin(ang)];
+  }
+  return at;
+})();
 const home = (() => {
   const by = {};
   for (const [id, c] of Object.entries(comp)) (by[c] ??= []).push(id);
   const order = Object.values(by).sort((a, b) => b.length - a.length);
-  const at = {};
-  order.forEach((ids, i) => {
-    const a = i * 2.39996, r = 130 * Math.sqrt(i);  // golden-angle spiral
+  const at = {}, placed = {};
+  for (const ids of order) {
+    const count = {};  // the component's most common area
+    for (const id of ids) count[ideas[id].area] = (count[ideas[id].area] ?? 0) + 1;
+    const area = Object.keys(count).sort((a, b) => count[b] - count[a])[0];
+    const i = placed[area] = (placed[area] ?? -1) + 1;
+    const a = i * 2.39996, r = 60 * Math.sqrt(i);  // golden-angle spiral
+    const [cx, cy] = anchor[area];
     const mean = ids.reduce((s, id) => s + depth[id], 0) / ids.length;
-    ids.forEach((id, j) => at[id] = [r * Math.cos(a) + ((j * 37) % 60 - 30),
-                                      r * Math.sin(a) + (depth[id] - mean) * ROW]);
-  });
+    ids.forEach((id, j) => at[id] = [cx + r * Math.cos(a) + ((j * 37) % 60 - 30),
+                                      cy + r * Math.sin(a) + (depth[id] - mean) * ROW]);
+  }
+  for (const n of DATA.nodes) if (!(n.id in at)) {  // unconnected ideas start at their area
+    const i = placed[n.area] = (placed[n.area] ?? -1) + 1, a = i * 2.39996, r = 60 * Math.sqrt(i);
+    at[n.id] = [anchor[n.area][0] + r * Math.cos(a), anchor[n.area][1] + r * Math.sin(a)];
+  }
   return at;
 })();
+// each idea is pulled toward its area's spot, and softly toward the middle of
+// its area and of every area above it, more sideways than up and down, so
+// areas stay together and apart without flattening the rows
+G.d3Force("areas", alpha => {
+  const ns = G.graphData().nodes, mid = {};
+  for (const n of ns) for (const a of chain(n.area)) {
+    const s = mid[a] ??= [0, 0, 0]; s[0] += n.x; s[1] += n.y; s[2]++; }
+  for (const n of ns) {
+    const [ax, ay] = anchor[n.area];
+    n.vx += (ax - n.x) * 0.03 * alpha; n.vy += (ay - n.y) * 0.012 * alpha;
+    chain(n.area).forEach((a, i) => {
+      const [x, y, k] = mid[a], w = (0.04 + 0.02 * i) * alpha;
+      n.vx += (x / k - n.x) * w; n.vy += (y / k - n.y) * w * 0.4;
+    });
+  }
+});
 G.d3Force("layers", alpha => {
   const sum = {};  // per component: mean x, mean y and mean depth of the nodes shown
   const ns = G.graphData().nodes.filter(n => n.id in depth);
@@ -302,11 +398,14 @@ function load(at = {}) {
   const keep = document.getElementById("orphans").checked;
   const nodes = DATA.nodes.filter(n => keep || degree(n.id) > 0);
   const place = n => at[n.id] ? { ...n, x: at[n.id][0], y: at[n.id][1] }
-    : n.id in home ? { ...n, x: home[n.id][0], y: home[n.id][1] } : { ...n };
+    : { ...n, x: home[n.id][0], y: home[n.id][1] };
   G.graphData({ nodes: nodes.map(place), links: DATA.links.map(l => ({ ...l })) });
   document.getElementById("count").textContent = `${nodes.length} ideas · ${DATA.links.length} edges · ${DATA.now}`;
 }
 document.getElementById("orphans").onchange = () => { G._fitted = false; load(); };
+document.getElementById("shade").onchange = e => {
+  try { localStorage.setItem("reader-shade", e.target.checked ? "1" : "0"); } catch {} };
+try { document.getElementById("shade").checked = localStorage.getItem("reader-shade") !== "0"; } catch {}
 if (KEPT) {
   document.getElementById("orphans").checked = KEPT.orphans;
   G._fitted = true;  // keep their view rather than zooming to fit

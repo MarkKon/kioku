@@ -40,8 +40,10 @@ neighbourhood, and `reader graph maths/analysis` an area. The ↻ button (or `r`
 the layout, so answers recorded meanwhile show up. `--out page.html` writes a
 static page instead. Nodes are coloured by
 R (grey: never asked), an edge is solid when it needs and dashed when it only
-uses, what an idea rests on sits above it, and
-clicking a node shows its statement and every answer. It follows the system's
+uses, its arrow points to the idea that rests on it (which sits below), each
+area is a shaded region with its subareas shaded inside it (the `areas` box
+turns this off), hovering lights an idea's edges with particles flowing toward
+what rests on it, and clicking a node shows its statement and every answer. It follows the system's
 light or dark mode, with a toggle.
 
 ## Install
