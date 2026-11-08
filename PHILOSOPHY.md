@@ -76,10 +76,19 @@ sets of ideas.
 
 ## Principles, and why
 
-### 1. Evidence is only an answer to a question that was asked
+### 1. Evidence is an answer to a question, or verified work
 
+Evidence is an answer to a question that was asked, or a step of pairing work
+the reader typed and a test verified, graded by how much help it took.
 Conversation, things the agent taught, self-reports ("yes, I know Itô") and the
 reader's own notes are never evidence.
+
+Verified work passes the same tests as a question: a test with a key separates
+real understanding from pattern-matching, and the grade traces back to a
+recorded step. What it adds is volume: pairing exercises far more ideas than
+any block of questions could ask about, and the reader is demonstrably building
+the skill. Work that copies an explanation given in the same step is still
+teaching, not evidence.
 
 - **Self-report is badly calibrated.** People feel they understand things they
   can't explain (the illusion of explanatory depth, Rozenblit & Keil 2002), and
@@ -257,9 +266,12 @@ log below.
   proposition's answers say whether the reader can state and apply a claim,
   and the chain into it whether they can derive it. How fine-grained a claim
   should be is still open, and affects every lookup and every question.
-- **Competent use as evidence.** Code the reader writes correctly without being
-  asked shows something. For now it doesn't count (principle 1). Revisit only if
-  keeping evidence clean costs too many questions.
+- **Competent use outside pairing.** Test-verified pairing work counts
+  (principle 1). Correct code written elsewhere, with no test and no recorded
+  step, still does not; whether it should is open.
+- **Observed work's grade.** good/hard/again by the help a step took is a first
+  calibration; the memory model may need to weigh it differently from an
+  answer.
 - **Question fatigue.** How many questions per session the reader will put up
   with, and where "non-trivial" begins, can only be learned from use.
 
@@ -306,3 +318,8 @@ Newest last. Add an entry whenever a principle is added, changed or dropped.
 - **2026-11-03.** The learn skill moves into the repo beside reader-brief: it
   runs on the CLI, so it changes with it. The essay, paper and pair skills stay
   out; they use the model only through reader-brief.
+- **2026-11-07.** Test-verified pairing work becomes evidence, graded by the
+  help it took (good: clean from the brief; hard: help beyond the brief or a
+  slip; again: handed the answer). Pairing exercises more ideas than questions
+  can cover, and work a test checks is not the ambiguous conversation principle
+  1 excludes. Recorded as say-item blocks until the CLI gets a command for it.

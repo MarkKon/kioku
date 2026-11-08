@@ -39,7 +39,7 @@
   .legend { position: fixed; left: 12px; bottom: 12px; background: var(--panel);
     border: 1px solid var(--hair); border-radius: 8px; padding: 8px 10px; color: var(--ink-2);
     display: grid; grid-template-columns: auto auto; gap: 4px 8px; align-items: center; }
-  .ramp { width: 90px; height: 8px; border-radius: 4px; }
+  .ramp { width: 120px; height: 8px; border-radius: 4px; }
   .dot { width: 10px; height: 10px; border-radius: 50%; justify-self: center; }
   .ramp-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
   #panel { position: fixed; top: 0; right: 0; bottom: 0; width: 380px; background: var(--panel);
@@ -77,7 +77,7 @@
   <button id="theme" title="light / dark">◐</button>
 </div>
 <div class="legend">
-  <div><div class="ramp" id="ramp"></div><div class="ramp-ends"><span>R 0</span><span>1</span></div></div>
+  <div><div class="ramp" id="ramp"></div><div class="ramp-ends"><span>R 0</span><span>.5</span><span>1</span></div></div>
   <span>recall now</span>
   <span class="dot" style="background:var(--unknown)"></span><span>never asked</span>
   <span class="dot" style="border:2px solid var(--critical)"></span><span>last answer a misconception</span>
@@ -95,14 +95,33 @@ const DATA = /*{{data}}*/;
 const KEPT = (() => { try { return JSON.parse(sessionStorage.getItem("reader-kept")); }
                       catch { return null; } finally { sessionStorage.removeItem("reader-kept"); } })();
 
-// R → one blue ramp, faint to strong against the surface (validated steps:
-// light 250 … 700, dark 600 … 100), so well-held ideas stand out in both modes
-const RAMPS = {
-  light: ["#86b6ef","#6da7ec","#5598e7","#3987e5","#2a78d6","#256abf","#1c5cab","#184f95",
-          "#104281","#0d366b"],
-  dark: ["#184f95","#1c5cab","#256abf","#2a78d6","#3987e5","#5598e7","#6da7ec","#86b6ef",
-         "#9ec5f4","#b7d3f6","#cde2fb"],
+// R → an ochre → green → teal → blue ramp, faint to strong against the surface.
+// Half of it goes to R .5–.7 and .7–1 each, where the distinctions matter, so
+// .8, .9 and .95 read as different hues as well as lightnesses. Stops are
+// OKLCH [R, L, C, h], blended in OKLab; lightness is monotone, so order
+// survives colour-blindness and greyscale.
+const STOPS = {
+  light: [[0, .78, .09, 85], [.5, .74, .13, 125], [.7, .65, .12, 165], [.8, .59, .10, 195],
+          [.9, .51, .11, 240], [1, .39, .13, 275]],
+  dark: [[0, .42, .07, 85], [.5, .52, .11, 125], [.7, .62, .12, 165], [.8, .69, .10, 195],
+         [.9, .78, .095, 235], [1, .87, .065, 280]],
 };
+function oklab(stops, r) {
+  let i = 0; while (i < stops.length - 2 && r > stops[i + 1][0]) i++;
+  const [r0, ...p] = stops[i], [r1, ...q] = stops[i + 1], t = (r - r0) / (r1 - r0);
+  const ab = ([L, C, h]) => [L, C * Math.cos(h * Math.PI / 180), C * Math.sin(h * Math.PI / 180)];
+  const A = ab(p), B = ab(q);
+  return A.map((v, k) => v + (B[k] - v) * t);
+}
+function hex([L, a, b]) {
+  const l = (L + .3963377774 * a + .2158037573 * b) ** 3, m = (L - .1055613458 * a - .0638541728 * b) ** 3,
+        s = (L - .0894841775 * a - 1.2914855480 * b) ** 3;
+  return "#" + [4.0767416621 * l - 3.3077115913 * m + .2309699292 * s,
+                -1.2684380046 * l + 2.6097574011 * m - .3413193965 * s,
+                -.0041960863 * l - .7034186147 * m + 1.7076147010 * s].map(v => {
+    v = Math.max(0, Math.min(1, v)); v = v <= .0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - .055;
+    return Math.round(v * 255).toString(16).padStart(2, "0"); }).join("");
+}
 const dark = matchMedia("(prefers-color-scheme: dark)");
 let T = {}, RAMP = [];
 function theme() {
@@ -113,8 +132,9 @@ function theme() {
   const css = getComputedStyle(document.documentElement);
   for (const k of ["surface", "ink", "ink-2", "critical", "unknown", "link"])
     T[k] = css.getPropertyValue("--" + k).trim();
-  RAMP = RAMPS[mode];
-  document.getElementById("ramp").style.background = `linear-gradient(90deg, ${RAMP.join(",")})`;
+  RAMP = Array.from({ length: 101 }, (_, i) => hex(oklab(STOPS[mode], i / 100)));  // R in hundredths
+  document.getElementById("ramp").style.background =
+    `linear-gradient(90deg, ${RAMP.filter((_, i) => i % 5 === 0).join(",")})`;
   if (window.G) G.backgroundColor(T.surface);
 }
 theme();
@@ -125,8 +145,7 @@ document.getElementById("theme").onclick = () => {
   theme();
 };
 const C = k => T[k.replace(/^--/, "")];
-const colourOf = r => r == null ? T.unknown
-  : RAMP[Math.round(Math.max(0, Math.min(1, r)) * (RAMP.length - 1))];
+const colourOf = r => r == null ? T.unknown : RAMP[Math.round(Math.max(0, Math.min(1, r)) * 100)];
 
 const fmtR = r => r == null ? "–" : r >= 1 ? "1" : (Math.floor(r * 100) / 100).toFixed(2).replace(/^0/, "");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));

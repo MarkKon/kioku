@@ -21,10 +21,11 @@ lookup does not settle it.
   fact) with its assumptions inside it.
 - A **chain** says that some propositions together give another, by a named
   **step**.
-- **Evidence** is an answer they gave to a question you asked, about one
-  proposition or one chain. Nothing else counts: what they showed in
-  conversation, what you taught, what they say they know and what they wrote in
-  their notes move no number.
+- **Evidence** is an answer they gave to a question you asked, or a step of
+  pairing work they typed and a test verified (see Observed work), about one
+  proposition or one chain. Nothing else counts: what they said in passing,
+  what you taught, what they say they know and what they wrote in their notes
+  move no number.
 - A **memory model** turns each id's answers into **R**, the probability they
   recall it now (FSRS-6 on elapsed time, so R falls within a day too). An
   answer updates only the id it is about: nothing propagates through chains.
@@ -96,8 +97,8 @@ use it. There are three kinds of item:
   cannot hold.
 
 Write the block and pipe it into `reader ask`. It stores the block with its key
-under a new id (`q_…`), shuffles the options, and prints the block; show them
-that output as it is.
+under a new id (`q_…`), shuffles the options, and prints the block. They never
+see tool output: copy the printed block into your reply verbatim.
 
 ```
 # girsanov
@@ -152,9 +153,33 @@ item itself was wrong) is set aside, not edited:
 the item again, so a corrected reply goes through `reader answer`. To answer a
 finished item again, `reader answer --redo`; the old answer is archived too.
 
+## Observed work
+
+In pairing, a step the driver typed and its tests turned green is evidence for
+the ideas it exercised. Record it as a block of say items, one per proposition
+or chain, under the title `# pairing · step <n> · <name> (observed work)`.
+Each item states what the step asked for; its `=` reference states what was
+observed. Pipe it into `reader ask` and keep the output to yourself: it is a
+record, not a question. Then, per item, `reader answer <q_id> "<n>: observed:
+<what they did>"` and `reader grade <q_id> <n> good|hard|again`:
+
+- **good**: done clean from the brief. The brief's own materials are normal,
+  not help.
+- **hard**: needed help beyond the brief (a refresher, a pointer to a failure),
+  or had a slip.
+- **again**: handed the answer.
+
+An idea you taught within the same step gets no item: typing it straight after
+the explanation is not recall.
+
 ## Propositions
 
 Search before adding: `reader find <terms>`, and reuse what exists.
+
+Every new proposition joins the graph, so it can be found and kept current:
+chain it to an existing one (`reader new chain`), or say why it stands alone;
+give it the project's topic alongside its subject topics; and link the vault
+note with `--vault` when one exists.
 
 ```
 reader new prop <kebab-name> "<statement>" --topics <t1>,<t2> [--vault <id>] [--aliases "x, y"]
