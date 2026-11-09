@@ -129,33 +129,36 @@ tower property again"). If what is missing is not something they hold, it is
 not a hint but a gap, and it gets taught. No chain of tiny hops (the
 assistance dilemma: Koedinger & Aleven 2007).
 
-### Earlier steps come back, chosen by the model
+### Earlier steps come back (open)
 
 Retrieving an idea again after other material came between is what makes it
 stick, and a quick right answer straight after teaching is weak evidence
 (interleaving and spacing within a session: Rohrer & Taylor 2007; Karpicke &
-Roediger 2007; fluency illusions: Bjork, Dunlosky & Kornell 2013). Since R
-falls within the day, the model already says which earlier idea is due: each
-check includes the lesson's idea with the lowest R now, and the close
-re-asks each step once more. No schedule is kept by the skill; it reads R.
+Roediger 2007; fluency illusions: Bjork, Dunlosky & Kornell 2013).
 
-### Attempting first (open)
+The model cannot pick which idea comes back within a lesson: one good answer
+gives a stability of about 2.3 days, so R is .997 an hour later and .99 after
+three hours. Any rule built on R inside a session is noise. The proposal is to
+let the graph do it instead:
 
-Attempting a problem before being taught helps, even when the attempt fails
-(pretesting: Richland, Kornell & Kao 2009; productive failure: Kapur 2008,
-Sinha & Kapur 2021), but only when the learner can partly reason their way
-there, and it does not fit the model cleanly: a guess about something not yet
-taught is not evidence about memory, yet recording it as `again` holds R at 0
-and recording nothing loses it. Options:
+- **Checks compose.** A check item on step k is a case where the new idea has
+  to be used together with earlier steps it rests on (its needs and uses
+  edges), so earlier ideas are retrieved because the case requires them, not
+  because a rule says so. The item is tagged with the new idea.
+- **The goal block composes everything**, at the end, after the whole lesson
+  came between: each step is retrieved by the case, and items on the steps
+  whose only answer was given straight after teaching record that later
+  evidence.
 
-1. Leave it out of the default step; use it only where they can reason most
-   of the way, and do not record it.
-2. Record it with a marker (`before teaching`) that the memory model skips
-   but keeps as data for a later model (principle 12).
-3. Drop it.
+### Attempting first
 
-The recommendation is 2 with the use of 1: rare, small, and recorded but not
-counted.
+Not a separate turn: a prediction at the start of a step stops the flow for a
+question they cannot answer yet (pretesting helps: Richland, Kornell & Kao
+2009; Kapur 2008; but it costs a full turn here). When it fits, the last item
+of a step's check block asks about the next step before it is taught: rare,
+only where they can reason most of the way there. Its answer is recorded with
+a `before teaching` marker: the memory model skips it, and it stays as data,
+for instance to fit an idea's starting difficulty later (principle 12).
 
 ### Depth
 
@@ -257,6 +260,6 @@ that pass reach the live install.
 ## Open
 
 1. The name (`ken`, `engram`, `grasp`, or another).
-2. Attempting first: option 1, 2 or 3 above.
+2. How earlier steps come back (checks compose, above).
 3. `LESSON.md` in the working folder for lessons that span sessions.
 4. Publishing: public repo and licence (only changes the README).
