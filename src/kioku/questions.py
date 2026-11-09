@@ -88,8 +88,6 @@ def render(ask: dict) -> str:
             out.append("")
         out += [f"- **{string.ascii_lowercase[k]})** {o['text']}"
                 for k, o in enumerate(it["options"])]
-    out += ["", f"<!-- for the agent: block {ask['id']}; pass the reply on with "
-                f"`kioku answer {ask['id']} \"<reply>\"` -->"]
     return "\n".join(out)
 
 

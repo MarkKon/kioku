@@ -52,6 +52,10 @@ and b", a letter without a digit, two letters) is yours to settle first. Ask
 what they meant, or put the reading you would record to them in the format,
 and pass that on.
 
+A reply that asks a question instead of answering an item is not an answer:
+answer their question, pass on only the items they did answer, and ask the open
+item again, or a fresh one, once the question is settled.
+
 ## Answers that should not count
 
 An answer is set aside, never edited:

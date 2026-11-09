@@ -65,7 +65,8 @@ model only through a question they answer.
 
 A **question block** is up to six numbered items, answered in one line. Write
 it, pipe it into `kioku ask` (format and example: `kioku ask -h`), and copy the
-printed block into your reply verbatim: they never see tool output. Pass their
+block it prints between the lines into your reply, verbatim: they never see
+tool output, and the block you wrote holds the answer key. Pass their
 reply on as typed: `kioku answer <q_id> "<reply>"`, and grade say items with
 `--say N=good|hard|again`. Answer every ✗ in prose: the right answer and, for
 a misconception, why the wrong one tempts.

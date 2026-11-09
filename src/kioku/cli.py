@@ -513,7 +513,10 @@ def cmd_ask(ctx: Context, a):
         die("question block not stored:\n  " + "\n  ".join(problems))
     ask = questions.new_block(new_id("q_", ctx.store.ask_ids()), title, items, ctx.cfg.now)
     ctx.store.save_ask(ask)
-    print(questions.render(ask))
+    rule = "─" * 60
+    print(f"kioku: stored as {ask['id']}. Copy what is between the lines into your reply: it has "
+          f"no answer key, unlike the block you wrote. Pass their reply on with "
+          f"`kioku answer {ask['id']} \"<reply>\"`.\n{rule}\n{questions.render(ask)}\n{rule}")
 
 
 def open_ask(ctx: Context, qid: str) -> dict:

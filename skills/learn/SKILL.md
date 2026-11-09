@@ -35,6 +35,9 @@ can state and use it, its proof idea whether they can derive it.
   to be unproved here, with a reference when one exists.
 - One change at a time, said out loud: a changed theorem, plan or notation is
   announced with what changed and why.
+- What you teach is the idea's statement in the model. When the lesson needs a
+  different one (more general, other hypotheses), reword the idea with `kioku
+  edit` (or add a new one) before teaching it, and say so.
 
 ## 1. Goal
 
