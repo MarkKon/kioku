@@ -71,15 +71,23 @@ answer.
 
 `kioku graph` serves the whole model on localhost and opens it in the browser
 as a force-directed graph; `kioku graph girsanov` shows just that
-neighbourhood, and `kioku graph maths/analysis` an area. The ↻ button (or `r`) rebuilds the page from the model, keeping
-the layout, so answers recorded meanwhile show up. `--out page.html` writes a
-static page instead. Nodes are coloured by
-R (grey: never asked), an edge is solid when it needs and dashed when it only
-uses, its arrow points to the idea that rests on it (which sits below), each
-area is a shaded region with its subareas shaded inside it (the `areas` box
-turns this off), hovering lights an idea's edges with particles flowing toward
-what rests on it, and clicking a node shows its statement and every answer. It follows the system's
-light or dark mode, with a toggle.
+neighbourhood, and `kioku graph maths/analysis` an area. The ↻ button (or `r`)
+rebuilds the page from the model, keeping the layout, so answers recorded
+meanwhile show up. `--out page.html` writes a static page instead.
+
+Nodes are coloured by R (grey: never asked) and never overlap. An edge is solid
+when it needs and dashed when it only uses, and its arrow points to the idea
+that rests on it, which sits below. Each area is a shaded region, with its
+subareas shaded inside it. Hovering lights an idea's edges, with particles
+flowing toward what rests on it; clicking a node shows its statement and every
+answer. Search matches names, statements and aliases; `area:maths/analysis`
+lights an area.
+
+The settings menu (the sliders icon) sets node size, labels, spacing, shading,
+arrows, the theme and the key, and the page remembers them. The stats view
+(the bars icon, or `s`) shows the model in numbers: coverage, mean R, R across
+ideas, answers over time, each area and kind, and the ideas with the lowest R.
+Click an area or an idea there to see it in the graph.
 
 ## Configure
 

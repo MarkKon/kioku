@@ -8,7 +8,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <style>
-  :root {  /* light; dark below, from the OS or the toggle */
+  :root {  /* light; dark below, from the OS or the setting */
     --surface: #fcfcfb; --panel: #f3f2ee; --hair: rgba(11,11,11,0.10);
     --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
     --critical: #d03b3b; --unknown: #a3a29b; --link: 82,81,78;
@@ -24,30 +24,63 @@
     --critical: #d03b3b; --unknown: #5f5e5a; --link: 200,199,190;
   } }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; background: var(--surface); color: var(--ink);
     font: 13px/1.45 ui-sans-serif, system-ui, -apple-system, sans-serif; overflow: hidden; }
+  button, select, input { font: inherit; color: inherit; }
   #graph { position: fixed; inset: 0; }
-  .bar { position: fixed; top: 12px; left: 12px; display: flex; gap: 10px; align-items: center;
-    background: var(--panel); border: 1px solid var(--hair); border-radius: 8px; padding: 6px 10px; }
-  .bar button { background: none; border: 0; color: var(--ink-2); font-size: 15px; cursor: pointer; padding: 0 2px; }
-  .bar button:hover { color: var(--ink); }
-  .bar button[hidden] { display: none; }
-  .bar input[type=search] { background: transparent; border: 0; outline: 0; color: var(--ink);
-    font: inherit; width: 220px; }
-  .bar label { color: var(--ink-2); display: flex; gap: 4px; align-items: center; cursor: pointer; }
-  .bar .count { color: var(--muted); white-space: nowrap; }
-  .legend { position: fixed; left: 12px; bottom: 12px; background: var(--panel);
-    border: 1px solid var(--hair); border-radius: 8px; padding: 8px 10px; color: var(--ink-2);
-    display: grid; grid-template-columns: auto auto; gap: 4px 8px; align-items: center; }
-  .ramp { width: 120px; height: 8px; border-radius: 4px; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; justify-self: center; }
-  .ramp-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
-  #panel { position: fixed; top: 0; right: 0; bottom: 0; width: 380px; background: var(--panel);
+
+  /* the bar: search, counts, and three buttons */
+  .bar { position: fixed; top: 12px; left: 12px; right: auto; max-width: calc(100% - 24px); z-index: 3;
+    display: flex; gap: 8px; align-items: center;
+    background: var(--panel); border: 1px solid var(--hair); border-radius: 8px; padding: 5px 6px 5px 10px; }
+  .bar input[type=search] { background: transparent; border: 0; outline: 0; min-width: 0; width: 200px; }
+  .bar .count { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .icon { background: none; border: 0; color: var(--ink-2); cursor: pointer; padding: 3px; border-radius: 5px;
+    display: grid; place-items: center; }
+  .icon:hover { color: var(--ink); background: var(--hair); }
+  .icon.on { color: var(--ink); background: var(--hair); }
+  .icon svg { width: 16px; height: 16px; display: block; }
+  @media (max-width: 560px) { .bar .count { display: none; } .bar input[type=search] { width: 100%; } }
+
+  /* settings */
+  .menu { position: fixed; top: 54px; left: 12px; z-index: 4; width: 260px; max-width: calc(100% - 24px);
+    background: var(--panel); border: 1px solid var(--hair); border-radius: 8px; padding: 6px 12px 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.12); }
+  .menu h4 { margin: 8px 0 2px; font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .06em; }
+  .menu label { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 4px 0; color: var(--ink-2); cursor: pointer; }
+  .menu label.check { justify-content: flex-start; }
+  .menu input[type=range] { width: 120px; accent-color: var(--ink-2); }
+  .menu input[type=checkbox] { accent-color: var(--ink-2); margin: 0; }
+  .menu select { background: var(--surface); border: 1px solid var(--hair); border-radius: 5px; padding: 2px 4px; }
+  .menu .reset { margin-top: 6px; background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer;
+    text-decoration: underline dotted; }
+
+  /* the key, small and hideable */
+  .legend { position: fixed; left: 12px; bottom: 12px; z-index: 2; background: var(--panel);
+    border: 1px solid var(--hair); border-radius: 8px; padding: 6px 8px 7px 10px; color: var(--ink-2);
+    font-size: 12px; display: grid; grid-template-columns: auto auto; gap: 3px 8px; align-items: center; justify-items: start; }
+  .legend .head { grid-column: 1 / -1; justify-self: stretch; display: flex; justify-content: space-between; align-items: center;
+    color: var(--muted); font-size: 11px; }
+  .legend .head .icon { padding: 0 2px; font-size: 14px; line-height: 1; }
+  .legend .rrow { grid-column: 1 / -1; display: flex; gap: 8px; align-items: flex-start; }
+  .legend .rrow > span { width: 22px; text-align: center; line-height: 9px; }
+  .ramp { width: 84px; height: 7px; border-radius: 4px; }
+  .ramp-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; margin-left: 6px; }
+  .keybtn { position: fixed; left: 12px; bottom: 12px; z-index: 2; background: var(--panel);
+    border: 1px solid var(--hair); border-radius: 8px; padding: 3px 9px; color: var(--ink-2); cursor: pointer; }
+  .keybtn:hover { color: var(--ink); }
+
+  /* the side panel */
+  #panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(380px, 100%); background: var(--panel); z-index: 5;
     border-left: 1px solid var(--hair); padding: 18px 20px; overflow-y: auto;
     transform: translateX(100%); transition: transform .18s ease; }
   #panel.open { transform: none; }
   #panel h2 { font-size: 16px; margin: 0 0 2px; font-weight: 600; }
-  #panel .id { color: var(--muted); font-family: ui-monospace, monospace; font-size: 12px; }
+  .id { color: var(--muted); font-family: ui-monospace, monospace; font-size: 12px; }
   #panel .stats { display: flex; gap: 14px; margin: 12px 0; color: var(--ink-2); }
   #panel .stats b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
   #panel .statement { margin: 10px 0 14px; font-size: 14px; }
@@ -56,8 +89,7 @@
   #panel ul { list-style: none; margin: 0; padding: 0; }
   #panel li { padding: 4px 0; border-top: 1px solid var(--hair); color: var(--ink-2); }
   #panel li:first-child { border-top: 0; }
-  #panel a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--muted);
-    cursor: pointer; }
+  a[data-id] { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--muted); cursor: pointer; }
   #panel .grade { font-family: ui-monospace, monospace; font-size: 12px; color: var(--ink); }
   #panel .mis { color: var(--critical); }
   #panel .close { position: absolute; top: 10px; right: 12px; background: none; border: 0;
@@ -65,38 +97,125 @@
   .float-tooltip-kap { background: var(--panel) !important; color: var(--ink) !important;
     border: 1px solid var(--hair); border-radius: 6px !important; font: 12px/1.4 ui-sans-serif,
     system-ui, sans-serif !important; padding: 5px 8px !important; max-width: 320px; }
+
+  /* the stats page */
+  #stats { position: fixed; inset: 0; z-index: 1; overflow-y: auto; background: var(--surface);
+    padding: 64px 16px 40px; clip-path: inset(56px 0 0 0); }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  .wrap > header h1 { font-size: 18px; font-weight: 600; margin: 4px 0 0; }
+  .sub { color: var(--muted); margin: 0; font-size: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }
+  .tile, .card { background: var(--panel); border: 1px solid var(--hair); border-radius: 10px; padding: 12px 14px; }
+  .tile .label { color: var(--ink-2); font-size: 12px; }
+  .tile .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 2px 0 0; }
+  .tile .note { color: var(--muted); font-size: 12px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+    gap: 10px; margin-top: 10px; }
+  .card.wide { grid-column: 1 / -1; }
+  .card h2 { font-size: 14px; font-weight: 600; margin: 0; }
+  .plot { position: relative; height: 140px; margin: 14px 0 0 30px; }
+  .gl { position: absolute; left: 0; right: 0; border-top: 1px solid var(--hair); }
+  .gl span { position: absolute; right: 100%; margin-right: 6px; transform: translateY(-50%);
+    color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .cols { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; }
+  .col { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center;
+    border-radius: 4px 4px 0 0; cursor: default; }
+  .col:hover { background: var(--hair); }
+  .col .b { width: min(24px, 100%); border-radius: 4px 4px 0 0; }
+  .cols .gap, .xlab .gap { flex: 0 0 12px; }
+  .xlab { display: flex; gap: 2px; margin: 4px 0 0 30px; color: var(--muted); font-size: 11px; }
+  .xlab .ends { display: flex; justify-content: space-between; }
+  .tbl { width: 100%; border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .tbl th { color: var(--muted); font-size: 11px; font-weight: 600; text-align: right; padding: 4px 6px; }
+  .tbl th:first-child, .tbl td:first-child { text-align: left; }
+  .tbl td { border-top: 1px solid var(--hair); padding: 5px 6px; text-align: right; color: var(--ink-2); }
+  .tbl td:first-child { color: var(--ink); }
+  .tbl td:not(:first-child) { white-space: nowrap; }
+  .tbl tr[data-area], .tbl tr[data-id] { cursor: pointer; }
+  .tbl tr[data-area]:hover td, .tbl tr[data-id]:hover td { background: var(--hair); }
+  .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 1px; }
+  .meter { display: inline-block; width: 64px; height: 6px; border-radius: 3px; background: var(--hair);
+    vertical-align: 1px; margin-left: 8px; overflow: hidden; }
+  .meter span { display: block; height: 100%; border-radius: 3px; }
+  @media (max-width: 560px) { .meter { display: none; } }
+  .empty { color: var(--muted); margin: 10px 0 0; }
+  #tip { position: fixed; z-index: 9; pointer-events: none; background: var(--panel); color: var(--ink);
+    border: 1px solid var(--hair); border-radius: 6px; padding: 5px 8px; font-size: 12px; max-width: 260px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.1); }
 </style>
 </head>
 <body>
 <div id="graph"></div>
+
 <div class="bar">
   <input type="search" id="q" placeholder="Search…" autocomplete="off">
-  <label><input type="checkbox" id="orphans" checked> unconnected</label>
-  <label><input type="checkbox" id="shade" checked> areas</label>
   <span class="count" id="count"></span>
-  <button id="refresh" title="refresh from the model (r)" hidden>↻</button>
-  <button id="theme" title="light / dark">◐</button>
+  <button class="icon" id="refresh" title="refresh from the model (r)" hidden>
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5"/></svg></button>
+  <button class="icon" id="statsbtn" title="stats (s)">
+    <svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="8" width="3" height="6" rx="1"/><rect x="6.5" y="3" width="3" height="11" rx="1"/><rect x="11" y="6" width="3" height="8" rx="1"/></svg></button>
+  <button class="icon" id="menubtn" title="settings">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h12"/><circle cx="5" cy="4" r="1.6" fill="var(--panel)"/><circle cx="11" cy="8" r="1.6" fill="var(--panel)"/><circle cx="7" cy="12" r="1.6" fill="var(--panel)"/></svg></button>
 </div>
-<div class="legend">
-  <div><div class="ramp" id="ramp"></div><div class="ramp-ends"><span>R 0</span><span>.5</span><span>1</span></div></div>
-  <span>recall now</span>
+
+<div class="menu" id="menu" hidden>
+  <h4>Nodes</h4>
+  <label>Size <input type="range" id="s-size" min="0.4" max="2" step="0.1"></label>
+  <label class="check"><input type="checkbox" id="s-links"> Bigger with more edges</label>
+  <label>Labels <select id="s-labels"><option value="zoom">when zoomed in</option>
+    <option value="always">always</option><option value="hover">on hover only</option></select></label>
+  <label class="check"><input type="checkbox" id="s-orphans"> Unconnected ideas</label>
+  <h4>Layout</h4>
+  <label>Spacing <input type="range" id="s-spacing" min="0.6" max="2.2" step="0.1"></label>
+  <label class="check"><input type="checkbox" id="s-areas"> Area shading</label>
+  <label class="check"><input type="checkbox" id="s-arrows"> Arrows on edges</label>
+  <h4>Page</h4>
+  <label>Theme <select id="s-theme"><option value="system">system</option>
+    <option value="light">light</option><option value="dark">dark</option></select></label>
+  <label class="check"><input type="checkbox" id="s-legend"> Key</label>
+  <button class="reset" id="reset">Reset to defaults</button>
+</div>
+
+<div class="legend" id="legend">
+  <div class="head"><span>Key</span><button class="icon" id="hidekey" title="hide the key">×</button></div>
+  <div class="rrow" title="the chance they recall it now"><span>R</span><div><div class="ramp" id="ramp"></div><div class="ramp-ends"><span>0</span><span>.5</span><span>1</span></div></div></div>
   <span class="dot" style="background:var(--unknown)"></span><span>never asked</span>
-  <span class="dot" style="border:2px solid var(--critical)"></span><span>last answer a misconception</span>
-  <span class="dot" style="border:2px solid var(--ink)"></span><span>looked up</span>
-  <svg width="22" height="10"><line x1="1" y1="5" x2="15" y2="5" stroke="var(--muted)" stroke-width="1.5"/><path d="M14 1 L21 5 L14 9 Z" fill="var(--muted)"/></svg><span>needs: the arrow points to the idea that cannot be followed without it</span>
-  <svg width="22" height="10"><line x1="1" y1="5" x2="15" y2="5" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M14 1 L21 5 L14 9 Z" fill="var(--muted)"/></svg><span>uses only: the idea it points to carries it out</span>
-  <span class="dot" style="border-radius:3px;background:var(--hair)"></span><span>shading: an area, and the areas inside it</span>
+  <span class="dot" style="border:2px solid var(--critical)"></span><span title="their last answer showed a misconception">misconception</span>
+  <span class="dot" style="border:2px solid var(--ink)" data-if="focus"></span><span data-if="focus">looked up</span>
+  <svg width="22" height="10"><line x1="1" y1="5" x2="15" y2="5" stroke="var(--muted)" stroke-width="1.5"/><path d="M14 1 L21 5 L14 9 Z" fill="var(--muted)"/></svg><span title="the arrow points to the idea that cannot be followed without it">needs</span>
+  <svg width="22" height="10"><line x1="1" y1="5" x2="15" y2="5" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M14 1 L21 5 L14 9 Z" fill="var(--muted)"/></svg><span title="the idea it points to carries it out">uses only</span>
+  <span class="dot" style="border-radius:2px;background:var(--hair)" data-if="areas"></span><span data-if="areas" title="an area, with its subareas inside it">area</span>
 </div>
+<button class="keybtn" id="showkey" hidden>Key</button>
+
 <aside id="panel"><button class="close" id="close">×</button><div id="body"></div></aside>
+
+<section id="stats" hidden><div class="wrap" id="statsbody"></div></section>
+<div id="tip" hidden></div>
 
 <script>/*{{force-graph}}*/</script>
 <script>
 const DATA = /*{{data}}*/;
+const $ = id => document.getElementById(id);
 
 // a refresh reloads the page, which the server builds afresh from the model;
 // the layout, view, search and open panel are carried across in sessionStorage
 const KEPT = (() => { try { return JSON.parse(sessionStorage.getItem("kioku-kept")); }
-                      catch { return null; } finally { sessionStorage.removeItem("kioku-kept"); } })();
+                      catch { return null; } finally { try { sessionStorage.removeItem("kioku-kept"); } catch {} } })();
+
+// -- settings, kept per browser
+const DEFAULTS = { size: 1, links: true, labels: "zoom", orphans: true, spacing: 1,
+                   areas: true, arrows: true, theme: "system", legend: true };
+const S = (() => {
+  const s = { ...DEFAULTS };
+  try {  // older pages kept the theme and the shading under their own keys
+    const t = localStorage.getItem("kioku-theme"); if (t) s.theme = t;
+    if (localStorage.getItem("kioku-shade") === "0") s.areas = false;
+    Object.assign(s, JSON.parse(localStorage.getItem("kioku-settings")) || {});
+  } catch {}
+  return s;
+})();
+const save = () => { try { localStorage.setItem("kioku-settings", JSON.stringify(S)); } catch {} };
 
 // R → an ochre → green → teal → blue ramp, faint to strong against the surface.
 // Half of it goes to R .5–.7 and .7–1 each, where the distinctions matter, so
@@ -128,25 +247,19 @@ function hex([L, a, b]) {
 const dark = matchMedia("(prefers-color-scheme: dark)");
 let T = {}, RAMP = [];
 function theme() {
-  const set = localStorage.getItem("kioku-theme");
-  if (set) document.documentElement.dataset.theme = set;
-  else delete document.documentElement.dataset.theme;
-  const mode = T.mode = set || (dark.matches ? "dark" : "light");
+  if (S.theme === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = S.theme;
+  const mode = T.mode = S.theme === "system" ? (dark.matches ? "dark" : "light") : S.theme;
   const css = getComputedStyle(document.documentElement);
   for (const k of ["surface", "ink", "ink-2", "critical", "unknown", "link"])
     T[k] = css.getPropertyValue("--" + k).trim();
   RAMP = Array.from({ length: 101 }, (_, i) => hex(oklab(STOPS[mode], i / 100)));  // R in hundredths
-  document.getElementById("ramp").style.background =
-    `linear-gradient(90deg, ${RAMP.filter((_, i) => i % 5 === 0).join(",")})`;
+  $("ramp").style.background = `linear-gradient(90deg, ${RAMP.filter((_, i) => i % 5 === 0).join(",")})`;
   if (window.G) G.backgroundColor(T.surface);
+  if (!$("stats").hidden) renderStats();
 }
 theme();
 dark.addEventListener("change", theme);
-document.getElementById("theme").onclick = () => {
-  const now = document.documentElement.dataset.theme || (dark.matches ? "dark" : "light");
-  localStorage.setItem("kioku-theme", now === "dark" ? "light" : "dark");
-  theme();
-};
 const C = k => T[k.replace(/^--/, "")];
 const colourOf = r => r == null ? T.unknown : RAMP[Math.round(Math.max(0, Math.min(1, r)) * 100)];
 
@@ -163,10 +276,12 @@ for (const l of DATA.links) {
 }
 const degree = id => (nbrs[id]?.size ?? 0);
 const markOf = l => l.needs && l.uses ? "needs and uses" : l.needs ? "needs" : "uses";
+const asked = n => n.answers.some(a => a.flag !== "pre");
 
 // -- areas: every area, and each area above it, is a shaded region behind its
 // ideas; nested areas stack, so a subarea reads darker inside its parent
 const chain = a => a.split("/").map((_, i, p) => p.slice(0, i + 1).join("/"));
+const inArea = (n, a) => n.area === a || n.area.startsWith(a + "/");
 const AREAS = [...new Set(DATA.nodes.flatMap(n => chain(n.area)))]
   .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b));
 const TOPS = [...new Set(AREAS.map(a => a.split("/")[0]))];
@@ -185,12 +300,12 @@ function hull(pts) {  // monotone chain
 }
 const RING = Array.from({ length: 12 }, (_, i) => [Math.cos(i * Math.PI / 6), Math.sin(i * Math.PI / 6)]);
 function shadeAreas(ctx, scale) {
-  if (!document.getElementById("shade").checked) return;
+  if (!S.areas) return;
   const ns = G.graphData().nodes.filter(n => n.x != null);
   for (const a of AREAS) {
-    const inside = ns.filter(n => n.area === a || n.area.startsWith(a + "/"));
+    const inside = ns.filter(n => inArea(n, a));
     if (!inside.length) continue;
-    const level = a.split("/").length - 1, pad = Math.max(10, 30 - 8 * level);
+    const level = a.split("/").length - 1, pad = Math.max(8, 24 - 6 * level) * Math.sqrt(S.spacing);
     const h = hull(inside.flatMap(n => RING.map(([c, s]) => [n.x + pad * c, n.y + pad * s])));
     ctx.beginPath();  // round the corners through the edge midpoints
     const mid = i => { const p = h[i % h.length], q = h[(i + 1) % h.length];
@@ -225,43 +340,66 @@ function light(ids) {
 const dim = id => lit && !lit.has(id);
 const litLink = l => lit && lit.has(idOf(l.source)) && lit.has(idOf(l.target));
 
-const el = document.getElementById("graph");
+// a node's size: small, and larger with more edges when that is on
+function radius(n) { const r = 3 * S.size; return S.links ? r * Math.sqrt(1 + 0.45 * degree(n.id)) : r * 1.3; }
+const arrowLen = l => !S.arrows ? 0 : litLink(l) ? 6 : 4.5;
+
+const el = $("graph");
 const G = window.G = ForceGraph()(el)
   .backgroundColor(C("--surface"))
   .nodeId("id")
-  .nodeRelSize(3.2)
-  .nodeVal(n => 1 + 1.5 * degree(n.id))
+  .nodeRelSize(1)
+  .nodeVal(n => radius(n) ** 2)
   .nodeLabel(n => `<b>${esc(n.name)}</b> · ${esc(n.kind)} · R ${fmtR(n.r)}`)
   .linkLabel(l => `<b>${esc(ideas[idOf(l.target)]?.name)}</b> ${markOf(l)} <b>${esc(ideas[idOf(l.source)]?.name)}</b>`)
   .linkColor(l => `rgba(${T.link},${lit ? (litLink(l) ? 0.8 : 0.05) : 0.32})`)
   .linkWidth(l => (l.needs && l.uses ? 1.6 : 1) * (litLink(l) ? 1.5 : 1))
   .linkLineDash(l => l.needs ? null : [3, 2])
-  .linkDirectionalArrowLength(l => litLink(l) ? 7 : 5.5)
+  .linkDirectionalArrowLength(arrowLen)
   .linkDirectionalArrowRelPos(0.55)
   .linkDirectionalParticles(l => litLink(l) ? 2 : 0)  // lit edges flow toward what rests on them
-  .linkDirectionalParticleWidth(2.5)
+  .linkDirectionalParticleWidth(2.2)
   .linkDirectionalParticleSpeed(0.006)
   .onRenderFramePre(shadeAreas)
   .nodeCanvasObject(draw)
   .nodePointerAreaPaint((n, colour, ctx) => {
     ctx.fillStyle = colour; ctx.beginPath();
-    ctx.arc(n.x, n.y, radius(n) + 2, 0, 2 * Math.PI); ctx.fill();
+    ctx.arc(n.x, n.y, Math.max(radius(n) + 2, 5), 0, 2 * Math.PI); ctx.fill();
   })
   .onNodeHover(n => { if (!q.value) light(n ? new Set([n.id]) : null); el.style.cursor = n ? "pointer" : null; })
   .onLinkHover(l => { if (!q.value) lit = l ? new Set([idOf(l.source), idOf(l.target)]) : null; })
   .onNodeClick(n => open(n.id))
   .onLinkClick(l => open(idOf(l.target)))
-  .onBackgroundClick(() => close())
+  .onBackgroundClick(() => { close(); menu.hidden = true; })
   .cooldownTicks(300)
   .autoPauseRedraw(false)  // search, theme and hover change the drawing after the layout settles
   .onEngineStop(() => { if (!G._fitted) { G._fitted = true; G.zoomToFit(400, 60);
     setTimeout(() => { if (G.zoom() > 2.5) G.zoom(2.5, 300); }, 420); } });  // small views stay small
 
-G.d3Force("charge").strength(-70);
 // a gentle pull to the centre, as in Obsidian, so unconnected ideas stay near
 G.d3Force("gravity", (() => { let ns = []; const f = alpha => {
   for (const n of ns) { n.vx -= n.x * 0.04 * alpha; n.vy -= n.y * 0.04 * alpha; } };
   f.initialize = nodes => { ns = nodes; }; return f; })());
+// nodes never sit on each other: overlapping pairs are pushed apart, found
+// through a grid so a large model stays fast
+G.d3Force("collide", () => {
+  const ns = G.graphData().nodes, pad = 2.5 * S.spacing, cell = 2 * (3 * S.size * 4) + pad, grid = new Map();
+  for (const n of ns) { const k = `${Math.floor(n.x / cell)},${Math.floor(n.y / cell)}`;
+    (grid.get(k) ?? grid.set(k, []).get(k)).push(n); }
+  for (const n of ns) {
+    const gx = Math.floor(n.x / cell), gy = Math.floor(n.y / cell), rn = radius(n);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++)
+      for (const m of grid.get(`${gx + i},${gy + j}`) ?? []) {
+        if (m.index <= n.index) continue;
+        let dx = m.x + m.vx - n.x - n.vx, dy = m.y + m.vy - n.y - n.vy, d = Math.hypot(dx, dy);
+        const min = rn + radius(m) + pad;
+        if (d >= min) continue;
+        if (d === 0) { dx = Math.random() - .5; dy = Math.random() - .5; d = Math.hypot(dx, dy); }
+        const k = (min - d) / d * 0.35;
+        n.vx -= dx * k; n.vy -= dy * k; m.vx += dx * k; m.vy += dy * k;
+      }
+  }
+});
 // what an idea rests on sits above it. Each idea gets a depth, the longest path
 // of edges into it (an idea that rests on nothing sits just above the nearest
 // idea resting on it), and is pulled gently to that row; each link also nudges
@@ -288,11 +426,10 @@ for (const id of Object.keys(depth)) {
     if (!(m in comp)) { comp[m] = id; stack.push(m); }
 }
 const ROW = 42;
-// each component starts in its own place, biggest in the middle, already in
-// row order, and is held together loosely: started tangled, a force layout
-// never pulls components apart again
 // Components start near their area: top areas on a circle, their subareas
-// around them, and each component on a small spiral round its area's spot.
+// around them, and each component on a small spiral round its area's spot,
+// already in row order (started tangled, a force layout never pulls
+// components apart again).
 const anchor = (() => {
   const at = {}, R0 = 230 * Math.sqrt(TOPS.length);
   TOPS.forEach((t, i) => { const a = 2 * Math.PI * i / TOPS.length;
@@ -306,6 +443,7 @@ const anchor = (() => {
   }
   return at;
 })();
+const sp = () => S.spacing;
 const home = (() => {
   const by = {};
   for (const [id, c] of Object.entries(comp)) (by[c] ??= []).push(id);
@@ -320,7 +458,7 @@ const home = (() => {
     const [cx, cy] = anchor[area];
     const mean = ids.reduce((s, id) => s + depth[id], 0) / ids.length;
     ids.forEach((id, j) => at[id] = [cx + r * Math.cos(a) + ((j * 37) % 60 - 30),
-                                      cy + r * Math.sin(a) + (depth[id] - mean) * ROW]);
+                                      cy + r * Math.sin(a) + (depth[id] - mean) * ROW * sp()]);
   }
   for (const n of DATA.nodes) if (!(n.id in at)) {  // unconnected ideas start at their area
     const i = placed[n.area] = (placed[n.area] ?? -1) + 1, a = i * 2.39996, r = 60 * Math.sqrt(i);
@@ -336,7 +474,7 @@ G.d3Force("areas", alpha => {
   for (const n of ns) for (const a of chain(n.area)) {
     const s = mid[a] ??= [0, 0, 0]; s[0] += n.x; s[1] += n.y; s[2]++; }
   for (const n of ns) {
-    const [ax, ay] = anchor[n.area];
+    const [ax, ay] = anchor[n.area].map(v => v * sp());
     n.vx += (ax - n.x) * 0.03 * alpha; n.vy += (ay - n.y) * 0.012 * alpha;
     chain(n.area).forEach((a, i) => {
       const [x, y, k] = mid[a], w = (0.04 + 0.02 * i) * alpha;
@@ -351,23 +489,26 @@ G.d3Force("layers", alpha => {
     s[0] += n.x; s[1] += n.y; s[2] += depth[n.id]; s[3]++; }
   for (const n of ns) { const [x, y, d, k] = sum[comp[n.id]];
     n.vx += (x / k - n.x) * 0.03 * alpha;
-    n.vy += (y / k + (depth[n.id] - d / k) * ROW - n.y) * 0.12 * alpha; }
+    n.vy += (y / k + (depth[n.id] - d / k) * ROW * sp() - n.y) * 0.12 * alpha; }
 });
 G.d3Force("flow", alpha => {
   for (const l of G.graphData().links) {
     const s = l.source, t = l.target;
     if (typeof s !== "object") continue;  // not yet resolved by the link force
-    const short = 34 - (t.y - s.y);
+    const short = 34 * sp() - (t.y - s.y);
     if (short > 0) { const k = short * 0.12 * alpha; t.vy += k; s.vy -= k; }
   }
 });
-G.d3Force("link").distance(55);
+function spacing() {
+  G.d3Force("charge").strength(-60 * sp());
+  G.d3Force("link").distance(50 * sp());
+}
+spacing();
 
 function hexA(hex, a) {
   const v = parseInt(hex.slice(1), 16);
   return `rgba(${v >> 16},${(v >> 8) & 255},${v & 255},${Math.min(1, a)})`;
 }
-function radius(n) { return Math.sqrt(1 + 1.5 * degree(n.id)) * 3.2; }
 
 function draw(n, ctx, scale) {
   const faded = dim(n.id);
@@ -381,72 +522,121 @@ function draw(n, ctx, scale) {
   if (n.focus || n.id === selected) ring(C("--ink"), 1.5, n.mis ? 4 : 1.5);
   // labels fade in as you zoom, like Obsidian; lit nodes always show theirs
   const shown = lit ? lit.has(n.id) : false;
-  const a = shown ? 1 : Math.max(0, Math.min(1, (scale - 1.1) / 1.2));
+  const a = shown || S.labels === "always" ? 1 : S.labels === "hover" ? 0
+    : Math.max(0, Math.min(1, (scale - 1.3) / 1.2));
   if (a > 0 && !faded) {
     ctx.globalAlpha = a;
-    ctx.font = `${12 / scale}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.font = `${11 / scale}px ui-sans-serif, system-ui, sans-serif`;
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillStyle = shown ? C("--ink") : C("--ink-2");
-    ctx.fillText(n.name, n.x, n.y + r + 3 / scale);
+    ctx.fillText(n.name, n.x, n.y + r + 2.5 / scale);
   }
   ctx.globalAlpha = 1;
 }
 
-// -- data, with or without unconnected propositions
-const q = document.getElementById("q");
+// -- data, with or without unconnected ideas
+const q = $("q");
+function positions() {
+  const at = {};
+  for (const n of G.graphData().nodes) if (n.x != null) at[n.id] = [n.x, n.y];
+  return at;
+}
 function load(at = {}) {
-  const keep = document.getElementById("orphans").checked;
-  const nodes = DATA.nodes.filter(n => keep || degree(n.id) > 0);
+  const nodes = DATA.nodes.filter(n => S.orphans || degree(n.id) > 0);
   const place = n => at[n.id] ? { ...n, x: at[n.id][0], y: at[n.id][1] }
     : { ...n, x: home[n.id][0], y: home[n.id][1] };
   G.graphData({ nodes: nodes.map(place), links: DATA.links.map(l => ({ ...l })) });
-  document.getElementById("count").textContent = `${nodes.length} ideas · ${DATA.links.length} edges · ${DATA.now}`;
+  $("count").textContent = `${nodes.length} ideas · ${DATA.links.length} edges`;
+  $("count").title = `as of ${DATA.now}`;
 }
-document.getElementById("orphans").onchange = () => { G._fitted = false; load(); };
-document.getElementById("shade").onchange = e => {
-  try { localStorage.setItem("kioku-shade", e.target.checked ? "1" : "0"); } catch {} };
-try { document.getElementById("shade").checked = localStorage.getItem("kioku-shade") !== "0"; } catch {}
 if (KEPT) {
-  document.getElementById("orphans").checked = KEPT.orphans;
   G._fitted = true;  // keep their view rather than zooming to fit
   load(KEPT.at);
   G.centerAt(KEPT.centre.x, KEPT.centre.y); G.zoom(KEPT.zoom);
   G.d3AlphaDecay(0.08);  // already laid out: settle any new nodes without a long drift
 } else load();
 
-const refresh = document.getElementById("refresh");
+const refresh = $("refresh");
 refresh.hidden = !DATA.live;
 function reload() {
   if (!DATA.live) return;
-  const at = {};
-  for (const n of G.graphData().nodes) if (n.x != null) at[n.id] = [n.x, n.y];
-  sessionStorage.setItem("kioku-kept", JSON.stringify({ at, centre: G.centerAt(),
-    zoom: G.zoom(), selected, q: q.value, orphans: document.getElementById("orphans").checked }));
+  try { sessionStorage.setItem("kioku-kept", JSON.stringify({ at: positions(), centre: G.centerAt(),
+    zoom: G.zoom(), selected, q: q.value })); } catch {}
   location.reload();
 }
 refresh.onclick = reload;
-addEventListener("keydown", e => {
-  if (e.key === "r" && !e.metaKey && !e.ctrlKey && !e.altKey && e.target.tagName !== "INPUT") reload();
-});
 
-// -- search lights matches and their neighbours; Enter centres on the first
+// -- the settings menu: every change shows at once and is kept
+const menu = $("menu");
+$("menubtn").onclick = e => { e.stopPropagation(); menu.hidden = !menu.hidden; $("menubtn").classList.toggle("on", !menu.hidden); };
+addEventListener("pointerdown", e => {
+  if (!menu.hidden && !menu.contains(e.target) && !$("menubtn").contains(e.target)) {
+    menu.hidden = true; $("menubtn").classList.remove("on"); }
+});
+const APPLY = {
+  size: () => G.d3ReheatSimulation(),
+  links: () => G.d3ReheatSimulation(),
+  spacing: () => { spacing(); G.d3ReheatSimulation(); },
+  orphans: () => { G._fitted = false; load(positions()); },
+  arrows: () => G.linkDirectionalArrowLength(arrowLen),
+  areas: key, theme, legend: key,
+};
+function key() {
+  $("legend").hidden = !S.legend || !$("stats").hidden;
+  $("showkey").hidden = S.legend || !$("stats").hidden;
+  for (const e of document.querySelectorAll("#legend [data-if]"))
+    e.hidden = e.dataset.if === "areas" ? !S.areas : !DATA.nodes.some(n => n.focus);
+}
+function sync() {
+  for (const k of Object.keys(DEFAULTS)) {
+    const input = $("s-" + k);
+    if (input.type === "checkbox") input.checked = S[k]; else input.value = S[k];
+  }
+}
+for (const k of Object.keys(DEFAULTS)) {
+  const input = $("s-" + k);
+  input.oninput = () => {
+    S[k] = input.type === "checkbox" ? input.checked : input.type === "range" ? +input.value : input.value;
+    save(); APPLY[k]();
+  };
+}
+$("reset").onclick = () => {
+  const was = { ...S };
+  Object.assign(S, DEFAULTS); save(); sync();
+  for (const k of Object.keys(DEFAULTS)) if (was[k] !== S[k]) APPLY[k]();
+};
+$("hidekey").onclick = () => { S.legend = false; save(); sync(); key(); };
+$("showkey").onclick = () => { S.legend = true; save(); sync(); key(); };
+sync(); key();
+
+// -- search lights matches and their neighbours; Enter centres on the first.
+// `area:name` matches the ideas in that area and the areas inside it.
 const hay = n => [n.id, n.name, n.statement, n.area, ...(n.aliases || [])].join(" ").toLowerCase();
+const matches = (n, w) => w.startsWith("area:") ? inArea({ area: n.area.toLowerCase() }, w.slice(5)) : hay(n).includes(w);
 q.oninput = () => {
   const words = q.value.toLowerCase().split(/\s+/).filter(Boolean);
-  const hits = words.length ? Object.values(ideas).filter(n => words.every(w => hay(n).includes(w))) : [];
+  const hits = words.length ? Object.values(ideas).filter(n => words.every(w => matches(n, w))) : [];
   light(words.length ? new Set(hits.map(n => n.id).concat(hits.length ? [] : ["-"])) : null);
 };
 q.onkeydown = e => {
   if (e.key === "Enter" && lit) {
+    if (!$("stats").hidden) go("");
     const n = G.graphData().nodes.find(n => lit.has(n.id));
     if (n) { G.centerAt(n.x, n.y, 500); G.zoom(3, 500); open(n.id); }
   }
   if (e.key === "Escape") { q.value = ""; light(null); }
 };
 
+addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || ["INPUT", "SELECT"].includes(e.target.tagName)) return;
+  if (e.key === "r") reload();
+  if (e.key === "s") go($("stats").hidden ? "stats" : "");
+  if (e.key === "Escape") { menu.hidden = true; close(); }
+});
+
 // -- the side panel
-const panel = document.getElementById("panel"), body = document.getElementById("body");
-document.getElementById("close").onclick = close;
+const panel = $("panel"), body = $("body");
+$("close").onclick = close;
 function close() { selected = null; panel.classList.remove("open"); }
 const link = id => `<a data-id="${id}">${esc(ideas[id]?.name ?? id)}</a>`;
 body.onclick = e => { const id = e.target.dataset?.id; if (id) open(id, true); };
@@ -456,7 +646,7 @@ function answers(list) {
   return `<ul>${list.slice().reverse().map(a =>
     `<li><span class="grade">${a.at} ${esc(a.grade)}${a.conf != null ? " · " + a.conf : ""}</span>
      ${a.flag === "mis" ? '<span class="mis">misconception</span>' : a.flag === "unseen" ? "never met" : a.flag === "pre" ? "before teaching" : ""}
-     <span class="id">${esc(a.kind)} ${esc(a.ask)}</span><br>${esc(a.note)}</li>`).join("")}</ul>`;
+     <span class="id">${esc(a.kind)}${a.depth ? " · " + esc(a.depth) : ""} ${esc(a.ask)}</span><br>${esc(a.note)}</li>`).join("")}</ul>`;
 }
 function stats(x) {
   const s = x.stability == null ? "–" : x.stability < 10 ? x.stability.toFixed(1) : Math.round(x.stability);
@@ -485,12 +675,160 @@ function open(id, centre) {
   }
 }
 
+// -- the stats page (#stats): the model in numbers, every idea and area a way back into the graph
+const statsEl = $("stats");
+function go(where) {
+  if (where) location.hash = where;
+  else history.replaceState(null, "", location.pathname + location.search);
+  route();
+}
+function route() {
+  const on = location.hash === "#stats";
+  statsEl.hidden = !on;
+  $("statsbtn").classList.toggle("on", on);
+  menu.hidden = true; $("menubtn").classList.remove("on");
+  if (on) { close(); renderStats(); G.pauseAnimation(); } else G.resumeAnimation();
+  key();
+}
+addEventListener("hashchange", route);
+$("statsbtn").onclick = () => go(statsEl.hidden ? "stats" : "");
+
+const when = s => new Date(s.replace(" ", "T"));
+const DAY = 864e5;
+const nice = v => v.toLocaleString();
+const mean = xs => xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null;
+
+function ticks(max) {  // round steps for an axis of counts
+  if (max <= 0) return [0, 1];
+  const raw = max / 3, p = 10 ** Math.floor(Math.log10(raw));
+  const step = Math.max(1, [1, 2, 5, 10].map(k => k * p).find(s => s >= raw));
+  const out = [0];
+  while (out.at(-1) < max) out.push(out.at(-1) + step);
+  return out;
+}
+// a column chart in plain HTML: groups of columns (a gap between groups), a
+// tooltip on every column, x labels under each group
+function columns(groups) {
+  const top = ticks(Math.max(...groups.flatMap(g => g.cols.map(c => c.value)))).at(-1);
+  const grid = ticks(top).map(v => `<div class="gl" style="bottom:${v / top * 100}%"><span>${v}</span></div>`).join("");
+  const cols = groups.map(g => g.cols.map(c =>
+    `<div class="col" data-tip="${esc(c.tip)}"><div class="b" style="height:${c.value / top * 100}%;background:${c.colour}"></div></div>`).join(""))
+    .join(`<div class="gap"></div>`);
+  const xlab = groups.map(g => `<div class="ends" style="flex:${g.cols.length}">${g.labels.map(l => `<span>${esc(l)}</span>`).join("")}</div>`)
+    .join(`<div class="gap"></div>`);
+  return `<div class="plot">${grid}<div class="cols">${cols}</div></div><div class="xlab">${xlab}</div>`;
+}
+const tile = (label, value, note) =>
+  `<div class="tile"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
+const meter = r => r == null ? "" : `<span class="meter"><span style="width:${r * 100}%;background:${colourOf(r)}"></span></span>`;
+
+function renderStats() {
+  const ns = DATA.nodes, now = when(DATA.now);
+  const all = ns.flatMap(n => n.answers.map(a => ({ ...a, t: when(a.at) })));
+  const ask = ns.filter(asked), withR = ns.filter(n => n.r != null);
+  const week = all.filter(a => now - a.t < 7 * DAY).length;
+  const mis = ns.filter(n => n.mis);
+  const scoped = ns.some(n => n.focus);
+
+  // recall now: asked ideas in tenths of R, and the ideas never asked beside them
+  const bins = Array.from({ length: 10 }, (_, i) => withR.filter(n => Math.min(9, Math.floor(n.r * 10)) === i));
+  const never = ns.length - withR.length;
+  const rChart = columns([
+    { cols: bins.map((b, i) => ({ value: b.length, colour: colourOf(i / 10 + .05),
+        tip: `<b>${b.length}</b> ideas with R ${fmtR(i / 10)}–${fmtR((i + 1) / 10)}` })), labels: ["R 0", ".5", "1"] },
+    { cols: [{ value: never, colour: T.unknown, tip: `<b>${never}</b> ideas with no graded answer` }], labels: ["none"] },
+  ]);
+
+  // answers over time: per day for a month or less, else per week (the last 26)
+  let aChart = `<p class="empty">No answers yet.</p>`, per = "week";
+  if (all.length) {
+    const first = new Date(Math.min(...all.map(a => a.t)));
+    per = now - first <= 31 * DAY ? "day" : "week";
+    const start = d => { const x = new Date(d); x.setHours(0, 0, 0, 0);
+      if (per === "week") x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x; };
+    const slots = [];
+    for (let d = start(first); d <= now; d.setDate(d.getDate() + (per === "week" ? 7 : 1))) slots.push(new Date(d));
+    const shown = slots.slice(-26);
+    const count = new Map(shown.map(d => [+d, []]));
+    for (const a of all) count.get(+start(a.t))?.push(a);
+    const day = d => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    aChart = columns([{ cols: shown.map(d => { const as = count.get(+d);
+        const by = ["again", "hard", "good", "easy", "guess"].map(g => [g, as.filter(a => a.grade === g).length]).filter(([, k]) => k);
+        return { value: as.length, colour: T["ink-2"],
+          tip: `${per === "week" ? "Week of " : ""}${day(d)}<br><b>${as.length}</b> answers${by.length ? "<br>" + by.map(([g, k]) => `${g} ${k}`).join(" · ") : ""}` }; }),
+      labels: shown.length > 1 ? [day(shown[0]), per === "week" ? "this week" : "today"] : [day(shown[0])] }]);
+  }
+  const depths = ["state", "use", "transfer"].map(d => [d, all.filter(a => a.depth === d).length]).filter(([, k]) => k);
+
+  // areas, as a tree: an area counts its subareas' ideas too
+  const parts = a => a.split("/");
+  const tree = AREAS.slice().sort((a, b) => { const p = parts(a), q = parts(b);
+    for (let i = 0; i < Math.min(p.length, q.length); i++) if (p[i] !== q[i]) return p[i].localeCompare(q[i]);
+    return p.length - q.length; });
+  const row = (label, inside, attr, swatch) => { const k = inside.filter(asked).length, r = mean(inside.filter(n => n.r != null).map(n => n.r));
+    return `<tr ${attr}><td>${swatch ?? ""}${label}</td><td>${inside.length}</td><td>${k}</td><td>${fmtR(r)}${meter(r)}</td></tr>`; };
+  const areas = tree.map(a => { const level = parts(a).length - 1;
+    return row(`<span style="padding-left:${level * 14}px"></span>${esc(parts(a).at(-1))}`, ns.filter(n => inArea(n, a)),
+      `data-area="${esc(a)}" title="show ${esc(a)} in the graph"`, level ? "" : `<span class="sw" style="background:${areaColour(a, 1)}"></span>`); }).join("");
+  const kinds = [...new Set(ns.map(n => n.kind))].sort().map(k => row(esc(k), ns.filter(n => n.kind === k), "")).join("");
+  const head = first => `<tr><th>${first}</th><th>ideas</th><th>asked</th><th>mean R</th></tr>`;
+
+  // the asked ideas with the lowest R now
+  const lastAt = n => n.answers.at(-1)?.at ?? "";  // among equal R, the latest answer first
+  const low = withR.slice().sort((a, b) => a.r - b.r || lastAt(b).localeCompare(lastAt(a))).slice(0, 10).map(n =>
+    `<tr data-id="${n.id}"><td>${esc(n.name)}<div class="id">${esc(n.area)}${n.mis ? ' · <span style="color:var(--critical)">misconception</span>' : ""}</div></td>
+     <td>${fmtR(n.r)}${meter(n.r)}</td></tr>`).join("");
+
+  $("statsbody").innerHTML = `
+    <header><h1>${scoped ? "These ideas" : "The model"} in numbers</h1>
+      <p class="sub">as of ${esc(DATA.now)}${scoped ? ` · the ${ns.length} ideas this page was opened on` : ""}</p></header>
+    <div class="tiles">
+      ${tile("Ideas", nice(ns.length), `in ${AREAS.length} areas · ${nice(DATA.links.length)} edges`)}
+      ${tile("Asked", ns.length ? Math.round(100 * ask.length / ns.length) + "%" : "–", `${nice(ask.length)} ideas with an answer`)}
+      ${tile("Mean recall", fmtR(mean(withR.map(n => n.r))), `R now, over ${nice(withR.length)} ideas`)}
+      ${tile("Answers", nice(all.length), `${nice(week)} in the last 7 days`)}
+      ${tile("Misconceptions", nice(mis.length), "ideas whose last answer was one")}
+    </div>
+    <div class="cards">
+      <div class="card"><h2>Recall now</h2><p class="sub">ideas by R today</p>${rChart}</div>
+      <div class="card"><h2>Answers per ${per}</h2><p class="sub">${depths.length ? "by depth: " + depths.map(([d, k]) => `${d} ${k}`).join(" · ") : "every answer and observed step"}</p>${aChart}</div>
+      <div class="card wide"><h2>Areas</h2><p class="sub">an area counts the areas inside it; click one to see it in the graph</p>
+        <table class="tbl">${head("area")}${areas}</table></div>
+      <div class="card"><h2>Lowest recall</h2><p class="sub">asked ideas, lowest R first</p>
+        ${low ? `<table class="tbl"><tr><th>idea</th><th>R</th></tr>${low}</table>` : `<p class="empty">Nothing asked yet.</p>`}</div>
+      <div class="card"><h2>Kinds</h2><p class="sub">what the ideas are</p><table class="tbl">${head("kind")}${kinds}</table></div>
+    </div>`;
+}
+statsEl.addEventListener("click", e => {
+  const tr = e.target.closest("tr");
+  if (tr?.dataset.area) {
+    go(""); q.value = "area:" + tr.dataset.area; q.oninput();
+    setTimeout(() => G.zoomToFit(500, 80, n => lit?.has(n.id)), 30);
+  } else if (tr?.dataset.id) {
+    const id = tr.dataset.id; go("");
+    const n = G.graphData().nodes.find(n => n.id === id);
+    if (n) { G.centerAt(n.x, n.y, 500); G.zoom(3, 500); }
+    open(id);
+  }
+});
+const tip = $("tip");
+statsEl.addEventListener("mousemove", e => {
+  const t = e.target.closest("[data-tip]");
+  if (!t) { tip.hidden = true; return; }
+  tip.innerHTML = t.dataset.tip; tip.hidden = false;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(innerWidth - w - 8, e.clientX + 12) + "px";
+  tip.style.top = Math.max(8, e.clientY - h - 10) + "px";
+});
+statsEl.addEventListener("mouseleave", () => { tip.hidden = true; });
+
 // a single lookup opens on its match; a refresh reopens what was open
 const focused = Object.values(ideas).filter(n => n.focus);
 if (KEPT) {
   if (KEPT.q) { q.value = KEPT.q; q.oninput(); }
   if (KEPT.selected) setTimeout(() => open(KEPT.selected), 50);
 } else if (focused.length === 1) setTimeout(() => open(focused[0].id), 50);
+route();
 addEventListener("resize", () => G.width(innerWidth).height(innerHeight));
 </script>
 </body>
