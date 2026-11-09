@@ -1,4 +1,4 @@
-# v1 skills: the memory skill, learn, pair
+# v1 skills: kioku, learn, pair
 
 Proposal, 2026-11-09, revised after the first read. The knowledge model is
 settled (`PHILOSOPHY.md`, "The model, and why"). This is the shape of the
@@ -9,21 +9,20 @@ Sources: the learning-science and programming-education literature (each rule
 names its source), and the past lesson and pairing sessions (quoted as
 _sessions_).
 
-## The name
+## The name: `kioku`
 
 `reader` was named for the essay and paper skills, whose audience is a
 reader. The tool is no longer about a reader: it is a memory model of the
 person an agent works with, a backend any skill can ask "do they hold this?".
-The name should say that. Candidates (the command can differ from the PyPI
-name, where all of these are taken):
+It becomes **`kioku`** (記憶, memory: the faculty and the store), a sibling of
+Anki (暗記, rote memorisation) that models what is held rather than drilling
+it. Installed from git with uv (`uv tool install git+…`, or `uvx --from git+…
+kioku` to try it), so the PyPI name does not matter.
 
-- **`ken`**: one's range of knowledge ("beyond my ken"). `ken context
-  girsanov`, `ken ask`. Short, unclaimed as a command here.
-- **`engram`**: a memory trace. Precise, but heavier.
-- **`grasp`**: what someone has grasped. Plain, slightly generic.
-
-The person is **the learner** in the docs (the driver, in pairing). The
-always-loaded skill takes the tool's name.
+The rename covers the package and command, the environment variables
+(`KIOKU_HOME`, …), the default folder (`~/.local/share/kioku`, moved at the
+switch), the always-loaded skill (`kioku`), and the docs. The person is
+**the learner** in the docs (the driver, in pairing).
 
 ## What all three share
 
@@ -52,9 +51,9 @@ These come from what went wrong in past sessions, and hold in every skill:
   background, how they answer (paper, tablet, voice), notation, where their
   notes are, usual session length. Every skill reads it once per session.
 
-## The memory skill: small, loaded by every session
+## `kioku`: small, loaded by every session
 
-Renamed from `reader-brief` to the tool's name. Its job: let any agent, in any
+Renamed from `reader-brief`. Its job: let any agent, in any
 task, find out whether the learner holds what the next step leans on, and ask
 when it is not settled. It is read by almost every session, so the main file
 stays under about 700 words; what is needed only sometimes is one link away.
@@ -259,7 +258,6 @@ that pass reach the live install.
 
 ## Open
 
-1. The name (`ken`, `engram`, `grasp`, or another).
-2. How earlier steps come back (checks compose, above).
-3. `LESSON.md` in the working folder for lessons that span sessions.
-4. Publishing: public repo and licence (only changes the README).
+1. How earlier steps come back (checks compose, above).
+2. `LESSON.md` in the working folder for lessons that span sessions.
+3. Publishing: public repo and licence (only changes the README).
