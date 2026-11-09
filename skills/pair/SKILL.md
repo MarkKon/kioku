@@ -24,10 +24,8 @@ Load the kioku skill first, and read `kioku profile`.
    **concepts** (the maths, the algorithm, the architecture, the design) and
    **API pieces** (the library calls and idioms that type it; their ideas live
    in `tools/…` areas).
-2. `kioku context` the concepts the first steps lean on. A concept the code
-   implements, whose R does not settle that they hold it, gets a question
-   block before you rely on it. API pieces need no question: they come with
-   the materials.
+2. Run the check (below, "Every step") over what the first steps lean on,
+   concepts and API pieces alike: the first block is the warm-up.
 3. Orient: read the code the work touches and the repo's conventions
    (`AGENTS.md`, `CLAUDE.md`, `GLOSSARY.md`) when it has them. Their own notes
    (see the profile) are a source to read, never to write.
@@ -36,30 +34,34 @@ Load the kioku skill first, and read `kioku profile`.
 Pairing pays on hard, unfamiliar work. When the goal turns out to be a
 five-line change they can already make, say so and let them do it alone.
 
-## Concepts: understood before typed
+## Every step: ask, then teach what is missing, then the brief
 
-When a step implements an idea (an architecture, an algorithm, a loss, a
-numerical scheme), they need to understand why it works: intuitively, enough
-to write it and to know what would break it. When its R does not settle that,
-open the step with a short lesson in the shape of a learn step: teach it at the
-size of what they hold, check it with one block, then give the brief.
+What they know is found out by asking, never assumed. Open each step in this
+order:
 
-That depth is the aim, not mental execution. A quick prediction (a shape, a
-sign, which way the loss moves) is fine when it is cheap and its answer
-teaches something; tracing fifty steps of an algorithm in one's head is not
-what pairing is for.
+1. **Look up** every idea the step leans on, concepts and API pieces alike
+   (`kioku context`). An idea with no entry is added first, with its edges.
+2. **Ask** what R and the last answer leave unsettled, in one block, before
+   any lesson or brief. No answers means unknown, not new: ask it. Only what
+   is clearly not held (they answered "never met", or a wrong answer has not
+   been repaired) skips the question and gets taught. When more is unsettled
+   than one block holds, ask what the step leans on hardest.
+3. **Teach** what the answers show missing, at the size of what they hold;
+   what they showed held gets a sentence or nothing.
+4. **Brief**, with materials sized by the answers and R.
 
-## API pieces: handed over, learned by use
+A **concept** (an architecture, an algorithm, a loss) is asked and taught at
+the depth the code needs: why it works, intuitively, enough to write it and to
+know what would break it. Not mental execution: a quick prediction (a shape, a
+sign, which way the loss moves) is fine when it is cheap; tracing fifty steps
+of an algorithm in one's head is not what pairing is for.
 
-The calls a step needs are part of its **materials**: each piece named, with
-its signature and a one-line example. These are the pieces to build with;
-building with them is what teaches them, and looking something up is a skill,
-not a gap. Questions are for concepts; signatures are never quizzed.
-
-Each step that lands records the pieces it used as observed work. As a piece
-keeps being used its R climbs, and once R says it is held, it drops out of the
-materials and they reach for it alone. If they stall on it, it comes back,
-with no fuss.
+An **API piece** is asked as use, never as recitation: whether they can use
+it the way this code needs (which call, what it returns, what goes wrong), not
+its signature. Looking a signature up is a skill, not a gap. The pieces a step
+needs come with its materials: each named, with its signature and a one-line
+example, until R says it is held; then it drops out and they reach for it
+alone. If they stall on it, it comes back, with no fuss.
 
 ## The keyboard
 
@@ -79,9 +81,11 @@ reach, so start a level or two below what a peer would get and climb as the
 session shows what they hold. When an instruction lands blank, drop one level
 (the operation, then the concrete edit) rather than repeating it louder.
 
-Climbing is **fading**, and the model carries it: full materials on an idea's
-first use, the brief without the materials once R shows it held, the goal
-without the brief after that. Ground stays new until the model shows it held.
+Climbing is **fading**, and it follows evidence, never a guess: full
+materials where the answers showed a gap, the brief without the materials once
+R shows it held, the goal without the brief after that. A piece they have
+shown they hold can be left out of the materials on purpose, saying so:
+whether they reach for it is evidence too.
 
 ## Materials
 
@@ -204,8 +208,8 @@ into a real hunt, say so and debug it together, hypothesis by hypothesis.
 
 ## Recording
 
-- **Before a step**: a concept it implements, with an R that does not settle
-  it, gets its question block (or short lesson) as you open the step.
+- **Before a step**: what it leans on and R leaves unsettled gets its
+  question block as you open the step (Every step).
 - **After a step**: when its tests turn green, record every idea it exercised
   as observed work (`kioku observed -h`), graded by the help it took: the
   concepts and the API pieces both, since the pieces' R is what fades them out
