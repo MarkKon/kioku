@@ -118,7 +118,8 @@ A handed-over test is a **contract**: they trust it and spend no thought on
 whether it is right. Earn that first: fixed inputs or a seed, no chance
 collisions, and green against a throwaway reference implementation in your
 scratch space. Each brief names the tests the step turns green, and names
-every test that stays red by design.
+every test that stays red by design. Tests for a later step never stop this
+step's tests from running: give them a stub to import, or their own file.
 
 ## Turns
 
@@ -205,8 +206,10 @@ into a real hunt, say so and debug it together, hypothesis by hypothesis.
 
 - **Before a step**: a concept it implements, with an R that does not settle
   it, gets its question block (or short lesson) as you open the step.
-- **After a step**: when its tests turn green, record what it exercised as
-  observed work (`kioku observed -h`), graded by the help it took. Record
+- **After a step**: when its tests turn green, record every idea it exercised
+  as observed work (`kioku observed -h`), graded by the help it took: the
+  concepts and the API pieces both, since the pieces' R is what fades them out
+  of the materials. Record
   while they type the next step, and report it in one line ("Recorded:
   `causal-attention-head` hard, `module-list` good").
 
