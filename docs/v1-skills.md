@@ -245,7 +245,7 @@ The skill can be invoked from plain language ("let's pair on…"), since
 - **`init`** writes a profile template with the sections the skills read:
   background, how they answer, notation, notes folder, session length.
 - The skills drop every personal reference (aissay and paiper in the brief,
-  `~/labvault` in pair). The notes folder stays a generic, optional feature.
+  a personal notes path in pair). The notes folder stays a generic, optional feature.
 
 ## Testing before use
 
