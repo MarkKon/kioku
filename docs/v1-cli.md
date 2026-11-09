@@ -1,4 +1,4 @@
-# reader v1: files and commands
+# kioku v1: files and commands
 
 A spec to agree on before code. The model itself (ideas, areas, edges, depth)
 is in `PHILOSOPHY.md` ("The model, and why") and `GLOSSARY.md`; this page is
@@ -18,7 +18,7 @@ Three aims, each from a v0 failure:
 ## The model folder
 
 ```
-profile.md                  who the reader is (unchanged)
+profile.md                  who the learner is (unchanged)
 config.toml                 settings (unchanged)
 areas/                      the area tree, as folders and files
   maths/
@@ -89,7 +89,7 @@ an alias or its id works; several are comma-separated.
 | `graph [what]` | the graph page | `graph` |
 | `upkeep` | lint, backup, duplicates, calibration, scout | `upkeep`, `lint`, `dupes`, `calib`, `scout` |
 
-### `reader context`
+### `kioku context`
 
 The main call, and the one an agent makes whenever the conversation moves to a
 new subject. (The outputs below are mock-ups; the numbers are not real data.) It takes an area, idea names or free terms, and tries them in that
@@ -98,7 +98,7 @@ order: exact idea name or id, area path or last segment, alias, statement text.
 An area shows its ideas and its sub-areas folded:
 
 ```
-$ reader context maths/analysis/metric-spaces
+$ kioku context maths/analysis/metric-spaces
 maths/analysis/metric-spaces · 7 ideas · 5 asked · last 11-03 · R = recall now, – = never asked
   contraction               definition  R .91  n2  11-03 good   use
   banach-fixed-point        result      R .62  n3  11-03 hard   use
@@ -115,7 +115,7 @@ in a screen.
 An idea shows its statement and its neighbours, one step each way:
 
 ```
-$ reader context banach-fixed-point
+$ kioku context banach-fixed-point
 banach-fixed-point · result · maths/analysis/metric-spaces · R .62 n3 · last 11-03 hard (use)
   A contraction $g$ (constant $q<1$) on a complete metric space …
   needs   contraction               R .91  n2  11-03 good
@@ -130,7 +130,7 @@ banach-fixed-point · result · maths/analysis/metric-spaces · R .62 n3 · last
 A miss says where it looked and how full that region is:
 
 ```
-$ reader context novikov
+$ kioku context novikov
 no idea, alias or statement matches "novikov" (412 ideas searched)
   nearest name: girsanov · maths/probability/stochastic-calculus · R .70
   maths/probability/stochastic-calculus · 31 ideas · 24 asked · last 11-07
@@ -139,12 +139,12 @@ no idea, alias or statement matches "novikov" (412 ideas searched)
 With no argument, `context` prints the top of the tree with coverage per area
 (v0 `status`).
 
-### `reader add` and `reader edit`
+### `kioku add` and `kioku edit`
 
 `add` reads one or more ideas from stdin, in the file format plus the area:
 
 ```
-reader add <<'EOF'
+kioku add <<'EOF'
 ## banach-fixed-point · result · maths/analysis/metric-spaces
 A contraction $g$ …
 - needs: contraction, complete-metric-space
@@ -164,9 +164,9 @@ It prints each new id, and refuses, printing what it found, when:
 `edit <name>` takes flags for small changes and stdin for a new statement:
 
 ```
-reader edit banach-fixed-point --uses +geometric-tail-bound --needs -metric-space
-reader edit banach-fixed-point --name banach-fixed-point-theorem --area maths/analysis
-reader edit banach-fixed-point <<'EOF'
+kioku edit banach-fixed-point --uses +geometric-tail-bound --needs -metric-space
+kioku edit banach-fixed-point --name banach-fixed-point-theorem --area maths/analysis
+kioku edit banach-fixed-point <<'EOF'
 A contraction on a complete metric space has exactly one fixed point …
 EOF
 ```
@@ -184,7 +184,7 @@ An area is nothing but where its ideas live, so changing the tree moves ideas
 and nothing else: evidence points at ids, edges at names, and coverage is
 recomputed.
 
-- **Unfold** a sub-theme that has grown: `reader edit a,b,c --area
+- **Unfold** a sub-theme that has grown: `kioku edit a,b,c --area
   maths/topology --new-area`. The ideas are found by `context topology`, which
   searches statements, even with no area of that name.
 - **When**: an agent adding the fifth or so idea on a sub-theme makes the area
@@ -194,7 +194,7 @@ recomputed.
 - **Fold** an area back by moving its ideas to the parent; an empty area's file
   is removed.
 
-### `reader ask` and `reader answer`
+### `kioku ask` and `kioku answer`
 
 `ask` is v0's block format, with each item tagged by idea name and,
 optionally, depth (default `use`):
@@ -209,22 +209,22 @@ optionally, depth (default `use`):
 `retract` for are flags on it:
 
 ```
-reader answer q_x "1b8 2= 3: because the drift cancels"
-reader answer q_x "…" --say 3=good           # grade a say item in the same call
-reader answer q_x --regrade 2=hard --mis "believed X → Y"
-reader answer q_x --retract 1 --why "misread the question"
-reader answer q_x "1a7" --redo
+kioku answer q_x "1b8 2= 3: because the drift cancels"
+kioku answer q_x "…" --say 3=good           # grade a say item in the same call
+kioku answer q_x --regrade 2=hard --mis "believed X → Y"
+kioku answer q_x --retract 1 --why "misread the question"
+kioku answer q_x "1a7" --redo
 ```
 
 A say item left ungraded is listed in the output as waiting, so it is not
 lost.
 
-### `reader observed`
+### `kioku observed`
 
 One call per step of verified pairing work, no block:
 
 ```
-reader observed --step "3 · causal head" register-buffer=hard tensor-broadcasting=good \
+kioku observed --step "3 · causal head" register-buffer=hard tensor-broadcasting=good \
   --note "register-buffer: needed the device demo"
 ```
 

@@ -1,42 +1,77 @@
-# reader
+# kioku
 
-A learner model for agents. It records what a reader has shown they know, so
-that coding and writing agents can pitch every explanation at their level:
-one step from what they hold, never re-teaching what they have.
+**kioku** (記憶, memory) is a memory model of the person an agent works with:
+the **learner**. It records what they have shown they know, as the probability
+they recall each idea now, so that any agent (writing, teaching, or
+pair-programming with them) can pitch its work one step from what they hold,
+ask a short question when it cannot tell, and never re-teach what they have.
 
-Why it works the way it does, and what it draws on, is in
-[PHILOSOPHY.md](PHILOSOPHY.md).
+It is for anyone who works with coding or writing agents and wants them to know
+where they stand. The tool and its skills are general; who you are lives in a
+profile in your own model folder. Why it works the way it does is in
+[PHILOSOPHY.md](PHILOSOPHY.md), and the words it uses in
+[GLOSSARY.md](GLOSSARY.md).
+
+## Install
+
+    uv tool install git+https://github.com/MarkKon/kioku
+    kioku init                          # creates ~/.local/share/kioku
+    $EDITOR ~/.local/share/kioku/profile.md
+    kioku skills --to ~/.claude/skills  # or wherever your agent reads skills
+
+To try it without installing: `uvx --from git+https://github.com/MarkKon/kioku
+kioku -h`.
+
+The profile is free text the agents read once per session: your background,
+how you like to answer (typing, paper, voice), your notation, where your notes
+are, how long your sessions usually are. Nothing about you goes anywhere else.
+
+## The skills
+
+`kioku skills` links three skills into your agent's skills folder:
+
+- **kioku**, loaded by almost every session: the check (look up, decide, ask,
+  pitch), the question block, and recording. Short on purpose; the formats are
+  in `kioku ask -h`, `kioku add -h` and `kioku observed -h`.
+- **learn** teaches a goal in one session, one checked step at a time, each
+  step taught at the size of what you hold.
+- **pair** pair-programs: you type, the agent navigates. Library calls come as
+  materials and fade as you hold them; the ideas the code implements are
+  understood before they are typed.
+
+Skills made for one person (your essay or paper workflow, your notes) belong
+in your own skills folder; they load the kioku skill and follow its check.
 
 ## The loop
 
-1. **Look up.** `reader context girsanov` shows an idea, what it needs and
-   uses, and what needs and uses it, each with R, the probability the reader
-   recalls it now; `reader context stochastic-calculus` lists an area with its
+1. **Look up.** `kioku context girsanov` shows an idea, what it needs and
+   uses, and what needs and uses it, each with R, the probability the learner
+   recalls it now; `kioku context stochastic-calculus` lists an area with its
    coverage, and a miss says where it looked.
 2. **Ask.** When R and the task leave it unsettled, the agent asks a short
-   question block (`reader ask`): multiple choice with a confidence digit, a
+   question block (`kioku ask`): multiple choice with a confidence digit, a
    formula written by hand, or one free line.
-3. **Record.** The reader's one-line reply goes to `reader answer`, which
+3. **Record.** The learner's one-line reply goes to `kioku answer`, which
    grades it and records the evidence at once.
 
-Ideas are added with `reader add` (blocks on stdin), changed or moved with
-`reader edit`, and removed with `reader rm`, which moves any answers to
+Ideas are added with `kioku add` (blocks on stdin), changed or moved with
+`kioku edit`, and removed with `kioku rm`, which moves any answers to
 `archive.md` rather than dropping them. An answer that should not count is set
-aside the same way with `reader answer --retract`. A step of pairing work that
-a test verified is recorded with `reader observed`.
+aside the same way with `kioku answer --retract`. A step of pairing work that
+a test verified is recorded with `kioku observed`.
 
 Evidence comes only from questions asked and answered and from verified work,
 never from conversation or self-report. A memory model (FSRS-6 for now, on
 elapsed time to the minute) turns each idea's answers into R. The model is
-plain files: one markdown file per area, holding its ideas (name, kind,
-statement, and edges marked needs or uses), and one line per answer. The words
-are defined in [GLOSSARY.md](GLOSSARY.md).
+plain files in a git repo: one markdown file per area, holding its ideas
+(name, kind, statement, and edges marked needs or uses), and one line per
+answer.
 
 ## See it
 
-`reader graph` serves the whole model on localhost and opens it in the browser
-as a force-directed graph; `reader graph girsanov` shows just that
-neighbourhood, and `reader graph maths/analysis` an area. The ↻ button (or `r`) rebuilds the page from the model, keeping
+`kioku graph` serves the whole model on localhost and opens it in the browser
+as a force-directed graph; `kioku graph girsanov` shows just that
+neighbourhood, and `kioku graph maths/analysis` an area. The ↻ button (or `r`) rebuilds the page from the model, keeping
 the layout, so answers recorded meanwhile show up. `--out page.html` writes a
 static page instead. Nodes are coloured by
 R (grey: never asked), an edge is solid when it needs and dashed when it only
@@ -46,30 +81,19 @@ turns this off), hovering lights an idea's edges with particles flowing toward
 what rests on it, and clicking a node shows its statement and every answer. It follows the system's
 light or dark mode, with a toggle.
 
-## Install
-
-    uv tool install git+https://github.com/MarkKon/reader
-    reader init                      # creates ~/.local/share/reader
-    $EDITOR ~/.local/share/reader/profile.md
-
-Then link the skills into your agent's skills folder (for example
-`~/.claude/skills/`): `skills/reader-brief` teaches agents the loop and the
-question format, and `skills/learn` runs a lesson on it, sweeping the route
-to a goal and checking each step before the next rests on it.
-
 ## Configure
 
 Settings come from the environment, or from `config.toml` in the model folder:
 
-| env                  | config.toml   | what                                          |
-| -------------------- | ------------- | --------------------------------------------- |
-| `READER_HOME`        |               | the model folder (default `~/.local/share/reader`) |
-| `READER_VAULT`       | `vault`       | a folder of the reader's markdown notes, shown as hints |
-| `READER_SCOUT_MODEL` | `scout_model` | a [pi](https://github.com/badlogic/pi-mono) model that drafts ideas from notes |
+| env                 | config.toml   | what                                          |
+| ------------------- | ------------- | --------------------------------------------- |
+| `KIOKU_HOME`        |               | the model folder (default `~/.local/share/kioku`) |
+| `KIOKU_VAULT`       | `vault`       | a folder of your markdown notes, shown as hints |
+| `KIOKU_SCOUT_MODEL` | `scout_model` | a [pi](https://github.com/badlogic/pi-mono) model that drafts ideas from notes |
 
-Both the vault and the scout are optional. Run `reader upkeep` daily to check
-and back up the model (it commits to the model folder's git repo, and pushes
-when it has a remote) and to list duplicates and areas worth splitting.
+Both the notes folder and the scout are optional. Run `kioku upkeep` daily to
+check and back up the model (it commits to the model folder's git repo, and
+pushes when it has a remote) and to list duplicates and areas worth splitting.
 
 ## Code
 
@@ -82,9 +106,11 @@ when it has a remote) and to list duplicates and areas worth splitting.
 | `questions.py` | question blocks: parse, render, grade replies             |
 | `vault.py`     | the optional notes folder, read only                      |
 | `upkeep.py`    | checks, duplicates, areas to split, calibration, backup, drafting |
-| `view.py`      | the graph page (`reader graph`) and its local server; template and vendored [force-graph](https://github.com/vasturiano/force-graph) (MIT) in `assets/` |
+| `view.py`      | the graph page (`kioku graph`) and its local server; template and vendored [force-graph](https://github.com/vasturiano/force-graph) (MIT) in `assets/` |
 | `cli.py`       | arguments and printing                                    |
 | `migrate.py`   | one-off: a v0 folder (propositions, chains) → v1 (areas)  |
+
+The skills are in `skills/`, shipped inside the package so `kioku skills` can link them.
 
 ## Test
 

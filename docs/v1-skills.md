@@ -11,8 +11,8 @@ _sessions_).
 
 ## The name: `kioku`
 
-`reader` was named for the essay and paper skills, whose audience is a
-reader. The tool is no longer about a reader: it is a memory model of the
+`kioku` was named for the essay and paper skills, whose audience is a
+kioku. The tool is no longer about a learner: it is a memory model of the
 person an agent works with, a backend any skill can ask "do they hold this?".
 It becomes **`kioku`** (記憶, memory: the faculty and the store), a sibling of
 Anki (暗記, rote memorisation) that models what is held rather than drilling
@@ -53,7 +53,7 @@ These come from what went wrong in past sessions, and hold in every skill:
 
 ## `kioku`: small, loaded by every session
 
-Renamed from `reader-brief`. Its job: let any agent, in any
+Renamed from `kioku`. Its job: let any agent, in any
 task, find out whether the learner holds what the next step leans on, and ask
 when it is not settled. It is read by almost every session, so the main file
 stays under about 700 words; what is needed only sometimes is one link away.

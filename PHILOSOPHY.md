@@ -1,12 +1,12 @@
-# Why reader exists
+# Why kioku exists
 
 > The most important single factor influencing learning is what the learner
 > already knows. Ascertain this and teach him accordingly.
 > — David Ausubel, *Educational Psychology: A Cognitive View* (1968)
 
-This file explains why reader exists, the principles it keeps and the reason
+This file explains why kioku exists, the principles it keeps and the reason
 for each, the ideas it borrows from, and the questions it has not answered yet.
-The README says what reader does. This file says why it does it that way. When
+The README says what kioku does. This file says why it does it that way. When
 a change bends one of the principles, update this file first.
 
 This file describes the v1 model (ideas, areas, edges marked needs and uses),
@@ -48,7 +48,7 @@ effects in education research.
 Agents remove the cost of the tutor. What they don't have is the thing a good
 tutor carries from one session to the next: a model of what this learner has
 shown, what they have forgotten, and what they misunderstand. Each agent
-session starts blank. reader is that missing model, kept outside any single
+session starts blank. kioku is that missing model, kept outside any single
 agent so that every agent reads the same one. With it, any session can act as a
 mentor tuned to what you know, whether you are coding, writing, or asking a
 quick question, and not only when you ask to learn something.
@@ -99,7 +99,7 @@ four tests:
    theorem bundles parts that can be known apart (Banach: a unique fixed point,
    and the a priori estimate), the name goes to its main claim and each other
    part gets a name of its own. **When it is unclear, keep the idea whole**:
-   answers show when parts come apart (the reader keeps getting one part and
+   answers show when parts come apart (the learner keeps getting one part and
    missing the other), and that is when a part gets its own idea. The whole
    keeps its answers and needs the new part.
 3. **One short question can check it**, and a right answer is good evidence for
@@ -125,14 +125,14 @@ Why:
 
 - **v0 had no rule, and items grew.** Propositions had a median of 254
   characters. `causal-attention-head` held projections, scaling, mask, softmax
-  and output; a lesson's theorem was rewritten three times before the reader
+  and output; a lesson's theorem was rewritten three times before the learner
   cut it to "two facts". One grade then stood for several claims, and a right
   answer on the whole hid a wrong one on a part.
 - **The size of a unit is set by what is learned and forgotten together.**
   This is the knowledge component of Koedinger, Corbett and Perfetti's KLI
   framework: a unit is inferred from performance on a family of tasks, and when
   those tasks stop moving together, the unit is split. Test 2 is that rule for
-  an agent that has only one reader's answers.
+  an agent that has only one learner's answers.
 - **Wording is not identity.** In v0 the statement was the identity, so an
   answered idea could not be reworded, and agents amended four ideas straight
   after creating them. A name is what an agent searches for and what a person
@@ -146,10 +146,10 @@ Why:
 
 An edge from X to Y carries one or both of two marks:
 
-- **needs**: the reader cannot follow X's statement without holding Y. A
+- **needs**: the learner cannot follow X's statement without holding Y. A
   result needs the definitions its statement uses; a proof needs the result it
   proves.
-- **uses**: answering a question on X, or doing X, makes the reader carry Y
+- **uses**: answering a question on X, or doing X, makes the learner carry Y
   out. A proof uses the lemmas it applies; training a model uses
   `optimizer.zero_grad()`.
 
@@ -202,7 +202,7 @@ do three things:
   it opens the area the conversation is in and sees its ideas with R, and its
   sub-areas folded with counts, the way it would list a directory.
 - **They give coverage**: how many ideas an area has, how many have answers,
-  and when it was last asked. Coverage is what makes "the reader knows this
+  and when it was last asked. Coverage is what makes "the learner knows this
   area" a statement with a denominator. In v0 a topic showed "mean R 0.88" when
   one of its eleven ideas had evidence.
 - **They separate kinds of knowledge without a separate system.** Knowing
@@ -223,7 +223,7 @@ tell "not recorded" from "not found".
 
 ### Depth belongs to the question, not to the idea
 
-An idea can be known at different depths: the reader can state it, use it
+An idea can be known at different depths: the learner can state it, use it
 when it is named, or transfer it to a setting where nothing points to it.
 Each answer records the depth its question demanded. An idea does not get a
 separate R per depth.
@@ -244,14 +244,14 @@ Why:
 ### 1. Evidence is an answer to a question, or verified work
 
 Evidence is an answer to a question that was asked, or a step of pairing work
-the reader typed and a test verified, graded by how much help it took.
+the learner typed and a test verified, graded by how much help it took.
 Conversation, things the agent taught, self-reports ("yes, I know Itô") and the
-reader's own notes are never evidence.
+learner's own notes are never evidence.
 
 Verified work passes the same tests as a question: a test with a key separates
 real understanding from pattern-matching, and the grade traces back to a
 recorded step. What it adds is volume: pairing exercises far more ideas than
-any block of questions could ask about, and the reader is demonstrably building
+any block of questions could ask about, and the learner is demonstrably building
 the skill. Work that copies an explanation given in the same step is still
 teaching, not evidence.
 
@@ -259,7 +259,7 @@ teaching, not evidence.
   can't explain (the illusion of explanatory depth, Rozenblit & Keil 2002), and
   something that reads fluently feels known.
 - **Being taught something isn't knowing it.** An explanation the agent gave
-  says what the agent did, not what the reader can now do.
+  says what the agent did, not what the learner can now do.
 - **Conversation is ambiguous.** Using a term correctly in passing can come from
   real understanding or from pattern-matching. A question with a key can tell
   them apart, and a transcript can't.
@@ -272,14 +272,14 @@ questions are asked. That is acceptable: a question costs a moment.
 
 ### 2. No evidence means unknown, not zero
 
-Most of what any reader knows has never been recorded. An empty record calls for
-a question. It is not grounds to assume a gap and re-teach from scratch. reader
+Most of what any learner knows has never been recorded. An empty record calls for
+a question. It is not grounds to assume a gap and re-teach from scratch. kioku
 keeps "no R" visibly different from "R = 0" everywhere, from the CLI output to
 the colours in the graph.
 
 ### 3. Numbers, not verdicts
 
-reader outputs R, the probability the reader recalls an idea now, along with
+kioku outputs R, the probability the learner recalls an idea now, along with
 the evidence behind it. It does not output labels like "held" or "faded".
 
 - **How much an idea needs to be known depends on the task.** A premise the
@@ -289,7 +289,7 @@ the evidence behind it. It does not output labels like "held" or "faded".
   rules that define it. A probability carries its meaning with it.
 
 The agent combines R, the R of the neighbouring ideas, and the task to decide
-whether to ask. If a premise's R is high, the reader could probably rebuild a
+whether to ask. If a premise's R is high, the learner could probably rebuild a
 conclusion they've forgotten.
 
 ### 4. An answer updates only the idea it is about
@@ -313,14 +313,14 @@ grade against the wrong block.
 
 ### 6. Review comes from the work
 
-Unlike Anki, reader does not schedule reviews. R is information, not a
+Unlike Anki, kioku does not schedule reviews. R is information, not a
 timetable. Review happens when a task needs an idea: the check finds it was
 learned long ago and its R has dropped, so the agent asks, and that answer is
 the review. Ideas come back when they matter, at the moment they are needed.
 A session spent reviewing neglected ideas is still possible, but it is
-something the reader chooses, not a queue that runs their day.
+something the learner chooses, not a queue that runs their day.
 
-The model exists to estimate what the reader knows, not to make them keep it.
+The model exists to estimate what the learner knows, not to make them keep it.
 Forgetting is expected and fine: an idea that has not mattered for a year may
 well be gone, and the model should say so, not push it back into memory. The
 graph is built so that knowing and not knowing are easy to estimate, not so
@@ -329,7 +329,7 @@ that everything in it is retained.
 ### 7. Being shown the answer is teaching, not evidence
 
 Plain FSRS treats a failed item as relearned once the answer is shown, so it
-reports high recall straight after a wrong answer. In reader, a wrong last
+reports high recall straight after a wrong answer. In kioku, a wrong last
 answer holds R at 0 until a later right answer. This is principle 1 applied to
 the memory model.
 
@@ -342,20 +342,20 @@ A question exists to separate states of knowledge, not just to collect a grade.
   gets repaired before anything rests on it. Confident errors are also the ones
   people correct most readily once shown the answer (the hypercorrection effect).
 - **Each wrong option is a specific wrong model**, named with `::`, so a pick
-  reveals which misunderstanding the reader holds, not just that they are
+  reveals which misunderstanding the learner holds, not just that they are
   wrong. This is how concept inventories such as the Force Concept Inventory are
   built.
 - **Applying beats reciting.** An item that uses an idea in a new case tests
   understanding; one that asks for the statement tests memory of the wording.
-- **The answer format fits the reader**, as described in `profile.md`: a letter
+- **The answer format fits the learner**, as described in `profile.md`: a letter
   and a digit when they don't want to type, a formula written on paper or a
   tablet, a dictated line for a why.
 - **A question block is short, hardest item first.** A confident right answer
-  at the top shows where the reader stands. It records nothing about the ideas
+  at the top shows where the learner stands. It records nothing about the ideas
   below it (principle 4), so an idea a task leans on still gets its own answer.
 - **Each item stands alone.** Every term is defined in it or earlier, every
   wrong option is false outright, and the agent solves the item before asking.
-  A badly built item measures the agent, not the reader.
+  A badly built item measures the agent, not the learner.
 
 ### 9. A question costs a moment; a wrong pitch costs the conversation
 
@@ -364,11 +364,15 @@ the next step depends on the answer, and skip the question when it doesn't. If
 agents start asking about trivial things, tighten the threshold for asking. Don't
 drop the check.
 
-### 10. Nothing in the code is about one reader
+### 10. Nothing in the code or the skills is about one learner
 
-Who the reader is lives in `profile.md`, and their setup in `config.toml`, both
-in the private model folder. The code, the skill and this file are public and
-work for anyone. The learner record stays private.
+Who the learner is lives in `profile.md`, and their setup in `config.toml`, both
+in the private model folder. The code, the skills and this file are public and
+work for anyone; skills made for one person live outside the repo and call
+these. The learner record stays private.
+
+Why: an agent cannot tell from the code who it is talking to, so anything
+personal written into a skill is applied to everyone who installs it.
 
 ### 11. Infrastructure grows from use
 
@@ -396,10 +400,10 @@ rules sound. Until one does better, R comes from the idea's own answers.
 ## Ideas it draws on
 
 The first group is where the idea came from. The rest are related work found
-along the way, listed because each one supports or challenges a choice reader
+along the way, listed because each one supports or challenges a choice kioku
 makes.
 
-| idea | source | in reader |
+| idea | source | in kioku |
 | ---- | ------ | --------- |
 | Mastery learning | Bloom, "Learning for Mastery" (1968) | check before building; repair and re-check on a miss |
 | The 2 sigma problem | Bloom, *Educational Researcher* 13(6) (1984); VanLehn, *Educational Psychologist* 46(4) (2011) | the reason it is worth doing: agents make one-to-one tutoring affordable |
@@ -418,15 +422,15 @@ makes.
 | Illusion of explanatory depth | Rozenblit & Keil (2002) | why self-report is not evidence |
 | Desirable difficulties, productive failure | Bjork (1994); Kapur (2008) | the predict step in lessons; the open question of how much struggle to leave |
 | Memory woven into reading | Matuschak & Nielsen, [Quantum Country](https://quantum.country) and "How can we develop transformative tools for thought?" (2019) | the check sits inside the work, not in a separate review app |
-| Graph view | Obsidian | `reader graph` |
+| Graph view | Obsidian | `kioku graph` |
 
 ## Tensions and open questions
 
-These are the places where the philosophy is still unsettled. Using reader
+These are the places where the philosophy is still unsettled. Using kioku
 should settle them, and each settled one moves into the principles above or the
 log below.
 
-- **Goldilocks is more than level.** Knowing what the reader holds says what to
+- **Goldilocks is more than level.** Knowing what the learner holds says what to
   explain. It doesn't say how much to leave for them to work out themselves,
   which is where much of the learning happens (desirable difficulties). The
   learn skill's predict step is one answer, but there is no general rule yet.
@@ -465,7 +469,7 @@ log below.
 - **Observed work's grade.** good/hard/again by the help a step took is a first
   calibration; the memory model may need to weigh it differently from an
   answer.
-- **Question fatigue.** How many questions per session the reader will put up
+- **Question fatigue.** How many questions per session the learner will put up
   with, and where "non-trivial" begins, can only be learned from use.
 
 ## Decision log
@@ -555,3 +559,14 @@ Newest last. Add an entry whenever a principle is added, changed or dropped.
   18 became edges only and 3 were dropped as teaching order. 251 ideas in 19
   areas, 377 edges, no cycles; all 231 answers kept their idea, 23 now marked
   observed. The v0 folder stays beside it as `reader-v0`.
+- **2026-11-09.** The tool becomes kioku (記憶, memory), and the person it
+  models the learner: "reader" came from the essay and paper skills, and the
+  tool is now a memory model any skill consults. The skills are rebuilt
+  (`docs/v1-skills.md`): an always-loaded `kioku` skill kept short, with the
+  formats in the CLI's help; `learn` teaching each step at the size of what the
+  learner holds, with checks that compose earlier steps; `pair` moved into the
+  repo, handing API calls over as materials that fade once R says they are
+  held. Skills read R and answers, never labels laid over them: a first draft
+  that sorted route ideas into states was dropped for going against principle
+  3. An item can be asked before its idea is taught (`pre`): the answer is
+  kept as data and skipped by the memory model.

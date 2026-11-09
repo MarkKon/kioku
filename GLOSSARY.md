@@ -1,22 +1,23 @@
-# reader
+# kioku
 
-The language of reader's model of what a reader knows, from v1 on. The v0
+The language of kioku's model of what a learner knows, from v1 on. The v0
 terms it retired are listed at the end.
 
-## The reader and the model
+## The learner and the model
 
-**Reader**:
-The person an agent works with, whose knowledge the model estimates.
-_Avoid_: user, learner, student
+**Learner**:
+The person an agent works with, whose knowledge the model estimates; the
+driver, in pairing.
+_Avoid_: user, reader, student
 
 **Model**:
-Everything reader records about one reader: areas, ideas, edges and evidence.
+Everything kioku records about one learner: areas, ideas, edges and evidence.
 _Avoid_: knowledge base, memory base, graph
 
 ## What is known
 
 **Idea**:
-One named unit of knowledge that a reader could hold or lack on its own, and
+One named unit of knowledge that a learner could hold or lack on its own, and
 that one short question can check.
 _Avoid_: proposition, item, card, concept, knowledge component
 
@@ -64,13 +65,13 @@ both.
 _Avoid_: chain, link, dependency
 
 **Needs**:
-The mark on an edge from X to Y when the reader cannot follow X's statement
+The mark on an edge from X to Y when the learner cannot follow X's statement
 without holding Y.
 _Avoid_: prerequisite, rests on, premise
 
 **Uses**:
 The mark on an edge from X to Y when answering a question on X, or doing X,
-makes the reader carry out Y.
+makes the learner carry out Y.
 _Avoid_: encompasses, exercises, applies
 
 ## What was shown
@@ -80,15 +81,15 @@ One numbered item in a question block, about one idea.
 _Avoid_: item (alone), card, probe
 
 **Question block**:
-The few questions put to the reader at once, answered in one line.
+The few questions put to the learner at once, answered in one line.
 _Avoid_: quiz, ask
 
 **Answer**:
-The reader's graded reply to one question, recorded the moment it is graded.
+The learner's graded reply to one question, recorded the moment it is graded.
 _Avoid_: response, review
 
 **Observed work**:
-A step the reader did in pairing that a test verified, graded by the help it
+A step the learner did in pairing that a test verified, graded by the help it
 took.
 _Avoid_: demo, usage
 
@@ -107,7 +108,7 @@ How an answer went: again, hard, good or easy; a guess carries none.
 ## What the model says
 
 **R**:
-The probability that the reader recalls an idea now, computed by the memory
+The probability that the learner recalls an idea now, computed by the memory
 model from that idea's evidence.
 _Avoid_: mastery, score, retention, recall (as a depth)
 
@@ -131,3 +132,5 @@ _Avoid_: brief (for a single lookup), quiz
 **Chain**: now a proof idea and its edges; a chain that only recorded teaching
 order is dropped.
 **Topic**: now an area.
+**reader**: the tool is now kioku (記憶, memory); the person it models is the
+learner.

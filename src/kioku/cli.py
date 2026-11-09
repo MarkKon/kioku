@@ -20,6 +20,7 @@ import subprocess
 import sys
 import webbrowser
 from dataclasses import replace
+from importlib import resources
 from pathlib import Path
 from typing import NoReturn
 
@@ -123,6 +124,36 @@ def cmd_init(ctx: Context, a):
     if shutil.which("git") and not (ctx.cfg.home / ".git").exists():
         subprocess.run(["git", "init", "-q", str(ctx.cfg.home)], check=False)
     print(f"kioku: model in {ctx.cfg.home}; describe the learner in profile.md")
+
+
+def skills_dir() -> Path:
+    """The skills shipped with kioku: inside the installed package, or the repo's."""
+    packaged = Path(str(resources.files("kioku"))) / "skills"
+    return packaged if packaged.is_dir() else Path(__file__).resolve().parents[2] / "skills"
+
+
+def cmd_skills(ctx: Context, a):
+    src = skills_dir()
+    names = sorted(d.name for d in src.iterdir() if (d / "SKILL.md").exists())
+    if not a.to:
+        print(f"skills in {src}: {', '.join(names)}")
+        print("link them into your agent's skills folder: `kioku skills --to ~/.claude/skills`")
+        return
+    to = Path(a.to).expanduser()
+    to.mkdir(parents=True, exist_ok=True)
+    for n in names:
+        dest = to / n
+        if dest.is_symlink() and dest.resolve() == (src / n).resolve():
+            print(f"{n}: already linked")
+            continue
+        if dest.exists() or dest.is_symlink():
+            print(f"{n}: {dest} exists; left alone (remove it to link kioku's)")
+            continue
+        if a.copy:
+            shutil.copytree(src / n, dest)
+        else:
+            dest.symlink_to(src / n, target_is_directory=True)
+        print(f"{n}: {'copied' if a.copy else 'linked'} → {dest}")
 
 
 def cmd_profile(ctx: Context, a):
@@ -698,6 +729,10 @@ def parser() -> argparse.ArgumentParser:
 
     add("init", cmd_init, "create the model folder, its profile and its git repo")
     add("profile", cmd_profile, "who the learner is")
+    sp = add("skills", cmd_skills, "list the skills kioku ships, or link them into an agent's "
+             "skills folder")
+    sp.add_argument("--to", help="the skills folder, e.g. ~/.claude/skills or ~/.agents/skills")
+    sp.add_argument("--copy", action="store_true", help="copy instead of linking")
     sp = add("context", cmd_context, "look up an area, ideas or terms (comma-separated); "
              "no argument: the top of the area tree")
     sp.add_argument("what", nargs="*")
