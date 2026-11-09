@@ -34,21 +34,21 @@ BLOCK = """# test
 
 
 @pytest.fixture
-def reader(tmp_path):
+def kioku(tmp_path):
     home = tmp_path / "model"
     (home / "areas" / "maths" / "probability").mkdir(parents=True)
     (home / "areas" / "maths" / "probability" / "stochastic-calculus.md").write_text(AREA)
     (home / "areas" / "tools").mkdir()
     (home / "areas" / "tools" / "python.md").write_text("# tools/python\n")
     (tmp_path / "vault" / "notes").mkdir(parents=True)
-    env = {**os.environ, "READER_HOME": str(home), "READER_VAULT": str(tmp_path / "vault"),
-           "READER_TODAY": "2026-11-02"}
+    env = {**os.environ, "KIOKU_HOME": str(home), "KIOKU_VAULT": str(tmp_path / "vault"),
+           "KIOKU_TODAY": "2026-11-02"}
 
     def run(*args, stdin=None, ok=True, at=None):
-        r = subprocess.run([sys.executable, "-m", "reader", *args], input=stdin,
+        r = subprocess.run([sys.executable, "-m", "kioku", *args], input=stdin,
                            stdin=None if stdin is not None else subprocess.DEVNULL,
                            capture_output=True, text=True,
-                           env={**env, "READER_TODAY": at} if at else env)
+                           env={**env, "KIOKU_TODAY": at} if at else env)
         if ok:
             assert r.returncode == 0, r.stderr
         return r
@@ -58,14 +58,14 @@ def reader(tmp_path):
     return run
 
 
-def ask(reader):
-    out = reader("ask", stdin=BLOCK).stdout
-    qid = next(t for t in out.split("`") if t.startswith("reader answer q_")).split()[2]
+def ask(kioku):
+    out = kioku("ask", stdin=BLOCK).stdout
+    qid = next(t for t in out.split("`") if t.startswith("kioku answer q_")).split()[2]
     return qid, out
 
 
-def evidence(reader):
-    return [l for l in (reader.home / "evidence.md").read_text().splitlines() if l.startswith("- ")]
+def evidence(kioku):
+    return [l for l in (kioku.home / "evidence.md").read_text().splitlines() if l.startswith("- ")]
 
 
 def line_of(out, name):
@@ -75,8 +75,8 @@ def line_of(out, name):
 
 # -- looking up
 
-def test_context_of_an_idea_shows_its_edges_and_no_evidence(reader):
-    out = reader("context", "quadratic-variation").stdout
+def test_context_of_an_idea_shows_its_edges_and_no_evidence(kioku):
+    out = kioku("context", "quadratic-variation").stdout
     assert out.splitlines()[1] == ""
     assert "quadratic-variation · result · maths/probability/stochastic-calculus · R – n0" in out
     assert "needs      increments" in out and "needed by  quadratic-variation-proof" in out
@@ -84,98 +84,116 @@ def test_context_of_an_idea_shows_its_edges_and_no_evidence(reader):
     assert "maths/probability/stochastic-calculus · 3 ideas · 0 asked · last never" in out
 
 
-def test_context_of_an_area_and_of_the_tree(reader):
-    out = reader("context", "stochastic-calculus").stdout
+def test_context_of_an_area_and_of_the_tree(kioku):
+    out = kioku("context", "stochastic-calculus").stdout
     assert "maths/probability/stochastic-calculus · 3 ideas · 0 asked" in out
     assert "quadratic-variation-proof" in out and "proof" in out
-    top = reader("context").stdout
+    top = kioku("context").stdout
     assert "maths/" in top and "probability/" in top and "tools/" in top
-    up = reader("context", "maths/probability").stdout
+    up = kioku("context", "maths/probability").stdout
     assert "(no ideas of its own)" in up and "stochastic-calculus/" in up
 
 
-def test_a_miss_says_where_it_looked_and_what_is_near(reader):
-    out = reader("context", "quadratc").stdout
+def test_a_miss_says_where_it_looked_and_what_is_near(kioku):
+    out = kioku("context", "quadratc").stdout
     assert 'no idea, alias or statement matches "quadratc" (3 ideas searched)' in out
     assert "nearest" in out and "quadratic-variation" in out
-    hits = reader("context", "squared").stdout
+    hits = kioku("context", "squared").stdout
     assert "1 idea(s) mention it" in hits and "quadratic-variation-proof" in hits
 
 
 # -- asking and recording
 
-def test_answers_are_recorded_at_once_with_their_depth(reader):
-    qid, out = ask(reader)
-    stored = json.loads((reader.home / "asks" / f"{qid}.json").read_text())
+def test_answers_are_recorded_at_once_with_their_depth(kioku):
+    qid, out = ask(kioku)
+    stored = json.loads((kioku.home / "asks" / f"{qid}.json").read_text())
     assert [it["id"] for it in stored["items"]] == ["p_aaaa", "p_bbbb", "c_cccc"]
     right = "a" if "**a)** independent" in out else "b"
-    out = reader("answer", qid, f"1{right}9 2. 3: variance shrinks").stdout
+    out = kioku("answer", qid, f"1{right}9 2. 3: variance shrinks").stdout
     assert "--say 3=" in out
-    reader("answer", qid, "2=", "--say", "3=hard")
-    lines = evidence(reader)
+    kioku("answer", qid, "2=", "--say", "3=hard")
+    lines = evidence(kioku)
     assert [l.split()[2:5] for l in lines] == [
         ["p_aaaa", "pick", "good"], ["p_bbbb", "write", "good"], ["c_cccc", "say", "hard"]]
     assert " use " in lines[0] and " state " in lines[1]
-    assert "(use)" in reader("context", "increments").stdout.splitlines()[2]
-    reader("upkeep", "--check")
+    assert "(use)" in kioku("context", "increments").stdout.splitlines()[2]
+    kioku("upkeep", "--check")
 
 
-def test_wrong_last_answer_holds_r_at_zero(reader):
-    qid, out = ask(reader)
+def test_wrong_last_answer_holds_r_at_zero(kioku):
+    qid, out = ask(kioku)
     wrong = "b" if "**a)** independent" in out else "a"
-    reader("answer", qid, f"1{wrong}9")
-    line = evidence(reader)[0]
+    kioku("answer", qid, f"1{wrong}9")
+    line = evidence(kioku)[0]
     assert " again 9 mis use " in line and "misconception: thinks increments correlate" in line
-    row = line_of(reader("context", "stochastic-calculus").stdout, "increments")
+    row = line_of(kioku("context", "stochastic-calculus").stdout, "increments")
     assert "R .00" in row and "! misconception" in row
 
 
-def test_redo_regrade_and_retract(reader):
-    qid, out = ask(reader)
-    reader("answer", qid, "1-")
-    assert " unseen " in evidence(reader)[0]
-    reader("answer", qid, "--redo", "1?")
-    lines = evidence(reader)
+def test_redo_regrade_and_retract(kioku):
+    qid, out = ask(kioku)
+    kioku("answer", qid, "1-")
+    assert " unseen " in evidence(kioku)[0]
+    kioku("answer", qid, "--redo", "1?")
+    lines = evidence(kioku)
     assert len(lines) == 1 and "could not produce it" in lines[0]
-    reader("answer", qid, "--regrade", "1=hard")
-    assert " hard " in evidence(reader)[0]
-    assert "--why" in reader("answer", qid, "--retract", "1", ok=False).stderr
-    reader("answer", qid, "--retract", "1", "--why", "misclick")
-    assert evidence(reader) == []
-    archive = (reader.home / "archive.md").read_text()
+    kioku("answer", qid, "--regrade", "1=hard")
+    assert " hard " in evidence(kioku)[0]
+    assert "--why" in kioku("answer", qid, "--retract", "1", ok=False).stderr
+    kioku("answer", qid, "--retract", "1", "--why", "misclick")
+    assert evidence(kioku) == []
+    archive = (kioku.home / "archive.md").read_text()
     assert f"## 2026-11-02 · {qid}/1 · retracted: misclick" in archive
     right = "a" if "**a)** independent" in out else "b"
-    reader("answer", qid, f"1{right}8")  # open again
-    assert " good 8 " in evidence(reader)[0]
-    reader("upkeep", "--check")
+    kioku("answer", qid, f"1{right}8")  # open again
+    assert " good 8 " in evidence(kioku)[0]
+    kioku("upkeep", "--check")
 
 
-def test_answers_are_stamped_and_r_falls_within_the_day(reader):
-    qid, out = ask(reader)
+def test_answers_are_stamped_and_r_falls_within_the_day(kioku):
+    qid, out = ask(kioku)
     right = "a" if "**a)** independent" in out else "b"
-    reader("answer", qid, f"1{right}9", at="2026-11-02T09:15")
-    assert evidence(reader)[0].startswith("- 2026-11-02T09:15 p_aaaa pick good 9 use ")
+    kioku("answer", qid, f"1{right}9", at="2026-11-02T09:15")
+    assert evidence(kioku)[0].startswith("- 2026-11-02T09:15 p_aaaa pick good 9 use ")
 
     def r_at(t):
-        out = reader("context", "increments", "--answers", at=t).stdout
+        out = kioku("context", "increments", "--answers", at=t).stdout
         return float(out.split("R now ")[1].split(",")[0])
     assert r_at("2026-11-02T09:15") == 1 > r_at("2026-11-02T12:00") > r_at("2026-11-02T20:00")
 
 
-def test_ask_refuses_unknown_ideas(reader):
-    r = reader("ask", stdin="1 pick nope: q\n  * a\n  - b\n", ok=False)
+def test_ask_refuses_unknown_ideas(kioku):
+    r = kioku("ask", stdin="1 pick nope: q\n  * a\n  - b\n", ok=False)
     assert "unknown idea nope" in r.stderr
 
 
-def test_observed_work_is_one_call(reader):
-    out = reader("observed", "increments=good", "QV=hard", "--step", "2 · qv",
+def test_an_answer_before_teaching_is_kept_but_not_evidence(kioku):
+    out = kioku("ask", stdin="# p\n1 pick increments pre: guess\n  * a\n  - b\n").stdout
+    qid = next(t for t in out.split("`") if t.startswith("kioku answer q_")).split()[2]
+    kioku("answer", qid, "1-")
+    line = evidence(kioku)[0]
+    assert " pre " in line and " unseen " not in line
+    row = line_of(kioku("context", "stochastic-calculus").stdout, "increments")
+    assert "R   –" in row and "n0" in row  # not evidence: no R, not counted
+    assert "1 asked" not in kioku("context").stdout.split("probability")[1].splitlines()[0]
+    kioku("upkeep", "--check")
+
+
+def test_the_formats_are_in_the_help(kioku):
+    assert "pick|write|say <idea> [state|use|transfer] [pre]" in kioku("ask", "-h").stdout
+    assert "## <name> · <kind> · <area>" in kioku("add", "-h").stdout
+    assert "good   done clean" in kioku("observed", "-h").stdout
+
+
+def test_observed_work_is_one_call(kioku):
+    out = kioku("observed", "increments=good", "QV=hard", "--step", "2 · qv",
                  "--note", "QV: needed the variance hint").stdout
     assert "2 observed answer(s) recorded" in out
-    lines = evidence(reader)
+    lines = evidence(kioku)
     assert [l.split()[2:6] for l in lines] == [["p_aaaa", "observed", "good", "use"],
                                               ["p_bbbb", "observed", "hard", "use"]]
     assert "needed the variance hint" in lines[1] and "verified by" in lines[0]
-    reader("upkeep", "--check")
+    kioku("upkeep", "--check")
 
 
 # -- adding, editing, removing
@@ -191,75 +209,75 @@ $E[(\\int f dW)^2] = E \\int f^2 dt$ for adapted $f$ in $L^2$
 """
 
 
-def area_text(reader):
-    return reader.area.read_text()
+def area_text(kioku):
+    return kioku.area.read_text()
 
 
-def test_add_reads_ideas_from_stdin_and_keeps_the_format(reader):
-    out = reader("add", stdin=NEW).stdout
+def test_add_reads_ideas_from_stdin_and_keeps_the_format(kioku):
+    out = kioku("add", stdin=NEW).stdout
     assert "brownian-motion → maths/probability/stochastic-calculus (now 5 ideas)" in out
-    text = area_text(reader)
+    text = area_text(kioku)
     assert "## ito-isometry · result · i_" in text
     assert "- needs: brownian-motion\n- uses: increments" in text
     assert "$E[(\\int f dW)^2]" in text  # no shell ever saw the statement
-    assert "needed by  ito-isometry" in reader("context", "Wiener process").stdout
-    reader("upkeep", "--check")
+    assert "needed by  ito-isometry" in kioku("context", "Wiener process").stdout
+    kioku("upkeep", "--check")
 
 
-def test_add_refuses_what_would_spoil_the_model(reader):
+def test_add_refuses_what_would_spoil_the_model(kioku):
     def refused(text, *flags):
-        return reader("add", *flags, stdin=text, ok=False).stderr
+        return kioku("add", *flags, stdin=text, ok=False).stderr
 
     assert "no area maths/topology" in refused("## open-set · definition · maths/topology\nx\n")
-    reader("add", "--new-area", stdin="## open-set · definition · maths/topology\nx\n")
-    assert (reader.home / "areas" / "maths" / "topology.md").exists()
+    kioku("add", "--new-area", stdin="## open-set · definition · maths/topology\nx\n")
+    assert (kioku.home / "areas" / "maths" / "topology.md").exists()
     assert "edge to unknown idea `filtration`" in refused(
         "## adapted · definition · tools/python\nan adapted process\n- needs: filtration\n")
     assert "the name is taken by p_aaaa" in refused(
         "## increments · result · tools/python\nsomething else entirely\n")
     assert "close to quadratic-variation" in refused(
         "## quadratic-variations · result · tools/python\nthe QV of BM on [0,t] is t\n")
-    reader("add", "--anyway", stdin="## quadratic-variations · result · tools/python\n"
+    kioku("add", "--anyway", stdin="## quadratic-variations · result · tools/python\n"
                                      "the QV of BM on [0,t] is t\n")
     assert "cycle" in refused("## a-x · result · tools/python\nx one\n- needs: b-x\n\n"
                               "## b-x · result · tools/python\nx two\n- needs: a-x\n")
     assert "not one of" in refused("## odd · lemma · tools/python\nx\n")
-    reader("upkeep", "--check")
+    kioku("upkeep", "--check")
 
 
-def test_edit_renames_moves_and_rewrites_edges(reader):
-    reader("edit", "increments", "--name", "independent-increments")
-    text = area_text(reader)
+def test_edit_renames_moves_and_rewrites_edges(kioku):
+    kioku("edit", "increments", "--name", "independent-increments")
+    text = area_text(kioku)
     assert "## independent-increments · result · p_aaaa" in text
     assert "- needs: independent-increments" in text and "- uses: independent-increments" in text
-    reader("edit", "QV", stdin="the quadratic variation of BM on [0,t] equals t\n")
-    assert "the quadratic variation of BM on [0,t] equals t" in area_text(reader)
-    reader("edit", "quadratic-variation-proof", "--uses", "-independent-increments")
-    assert "- uses:" not in area_text(reader)
-    assert "cycle" in reader("edit", "independent-increments", "--needs",
+    kioku("edit", "QV", stdin="the quadratic variation of BM on [0,t] equals t\n")
+    assert "the quadratic variation of BM on [0,t] equals t" in area_text(kioku)
+    kioku("edit", "quadratic-variation-proof", "--uses", "-independent-increments")
+    assert "- uses:" not in area_text(kioku)
+    assert "cycle" in kioku("edit", "independent-increments", "--needs",
                              "+quadratic-variation-proof", ok=False).stderr
-    reader("edit", "independent-increments,quadratic-variation", "--area", "maths/bm",
+    kioku("edit", "independent-increments,quadratic-variation", "--area", "maths/bm",
            "--new-area")
-    moved = (reader.home / "areas" / "maths" / "bm.md").read_text()
-    assert "p_aaaa" in moved and "p_bbbb" in moved and "p_aaaa" not in area_text(reader)
-    reader("edit", "quadratic-variation-proof", "--area", "maths/bm")
-    assert not reader.area.exists()  # an emptied area's file goes
-    reader("upkeep", "--check")
+    moved = (kioku.home / "areas" / "maths" / "bm.md").read_text()
+    assert "p_aaaa" in moved and "p_bbbb" in moved and "p_aaaa" not in area_text(kioku)
+    kioku("edit", "quadratic-variation-proof", "--area", "maths/bm")
+    assert not kioku.area.exists()  # an emptied area's file goes
+    kioku("upkeep", "--check")
 
 
-def test_rm_respects_edges_and_archives_answers(reader):
-    qid, _ = ask(reader)
-    reader("answer", qid, "2=")
-    assert "needed or used by quadratic-variation-proof" in reader(
+def test_rm_respects_edges_and_archives_answers(kioku):
+    qid, _ = ask(kioku)
+    kioku("answer", qid, "2=")
+    assert "needed or used by quadratic-variation-proof" in kioku(
         "rm", "QV", "--why", "x", ok=False).stderr
-    reader("rm", "quadratic-variation-proof", "--why", "rewritten")
-    out = reader("rm", "QV", "--why", "duplicate").stdout
+    kioku("rm", "quadratic-variation-proof", "--why", "rewritten")
+    out = kioku("rm", "QV", "--why", "duplicate").stdout
     assert "1 answer(s) moved" in out
-    assert len(evidence(reader)) == 0
-    archive = (reader.home / "archive.md").read_text()
+    assert len(evidence(kioku)) == 0
+    archive = (kioku.home / "archive.md").read_text()
     assert "## 2026-11-02 · removed p_bbbb quadratic-variation · duplicate" in archive
-    reader("edit", "increments", "--needs", "+brownian", ok=False)
-    reader("upkeep", "--check")
+    kioku("edit", "increments", "--needs", "+brownian", ok=False)
+    kioku("upkeep", "--check")
 
 
 # -- the graph page
@@ -268,9 +286,9 @@ def page_data(page):
     return json.loads(page.split("const DATA = ", 1)[1].split(";\n", 1)[0])
 
 
-def test_graph_page_has_ideas_and_marked_edges(reader, tmp_path):
+def test_graph_page_has_ideas_and_marked_edges(kioku, tmp_path):
     out = tmp_path / "g.html"
-    reader("graph", "quadratic-variation-proof", "--out", str(out), "--no-open")
+    kioku("graph", "quadratic-variation-proof", "--out", str(out), "--no-open")
     data = page_data(out.read_text())
     assert data["live"] is False
     assert {n["id"] for n in data["nodes"]} == {"p_aaaa", "p_bbbb", "c_cccc"}
@@ -281,17 +299,17 @@ def test_graph_page_has_ideas_and_marked_edges(reader, tmp_path):
     assert "ForceGraph" in out.read_text()
 
 
-def test_graph_serves_a_page_built_afresh_on_every_request(reader):
+def test_graph_serves_a_page_built_afresh_on_every_request(kioku):
     import urllib.request
-    env = {**os.environ, "READER_HOME": str(reader.home), "READER_TODAY": "2026-11-02"}
-    proc = subprocess.Popen([sys.executable, "-m", "reader", "graph", "--no-open"],
+    env = {**os.environ, "KIOKU_HOME": str(kioku.home), "KIOKU_TODAY": "2026-11-02"}
+    proc = subprocess.Popen([sys.executable, "-m", "kioku", "graph", "--no-open"],
                             stdout=subprocess.PIPE, text=True, env=env)
     try:
         url = proc.stdout.readline().split()[0]
         first = page_data(urllib.request.urlopen(url).read().decode())
         assert next(n for n in first["nodes"] if n["id"] == "p_aaaa")["n"] == 0
-        qid, _ = ask(reader)
-        reader("answer", qid, "1-")
+        qid, _ = ask(kioku)
+        kioku("answer", qid, "1-")
         again = page_data(urllib.request.urlopen(url).read().decode())
         assert next(n for n in again["nodes"] if n["id"] == "p_aaaa")["n"] == 1
     finally:
@@ -321,7 +339,7 @@ def test_migration_from_v0(tmp_path):
     (tmp_path / "map.txt").write_text("sde = maths/stochastic-calculus\n")
 
     def mig(*args, ok=True):
-        r = subprocess.run([sys.executable, "-m", "reader.migrate", *map(str, args)],
+        r = subprocess.run([sys.executable, "-m", "kioku.migrate", *map(str, args)],
                            capture_output=True, text=True)
         if ok:
             assert r.returncode == 0, r.stderr
@@ -351,7 +369,7 @@ def test_migration_from_v0(tmp_path):
     assert "## quadratic-variation-proof · proof · c_cccc\nmean and variance" in text
     assert "- aliases: QV" in text
     assert " p_aaaa observed hard " in (home / "evidence.md").read_text()
-    env = {**os.environ, "READER_HOME": str(home), "READER_TODAY": "2026-11-03"}
-    r = subprocess.run([sys.executable, "-m", "reader", "upkeep", "--check"],
+    env = {**os.environ, "KIOKU_HOME": str(home), "KIOKU_TODAY": "2026-11-03"}
+    r = subprocess.run([sys.executable, "-m", "kioku", "upkeep", "--check"],
                        capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL)
     assert r.returncode == 0, r.stdout + r.stderr

@@ -5,7 +5,7 @@ used to the idea that needs or uses it: solid when it needs it, dashed when it
 only uses it. The layout pulls what an idea rests on above it. Nothing here
 writes to the model.
 
-`reader graph` serves the page on localhost, building it afresh on every
+`kioku graph` serves the page on localhost, building it afresh on every
 request, so the page's refresh button shows answers recorded since it opened.
 """
 
@@ -60,11 +60,11 @@ def graph(m: Model, ids: list[str] | None = None, focus: Iterable[str] = ()) -> 
     return {"now": f"{m.now:%Y-%m-%d %H:%M}", "nodes": nodes, "links": links}
 
 
-def html(data: dict, title: str = "reader", live: bool = False) -> str:
+def html(data: dict, title: str = "kioku", live: bool = False) -> str:
     """The page, with the data and the graph library inlined (works offline).
 
     A live page is served by `serve` and shows a refresh button."""
-    assets = resources.files("reader") / "assets"
+    assets = resources.files("kioku") / "assets"
     page = (assets / "graph.html").read_text()
     lib = (assets / "force-graph.min.js").read_text()
     blob = json.dumps({**data, "live": live}, ensure_ascii=False).replace("</", "<\\/")

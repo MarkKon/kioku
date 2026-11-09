@@ -95,8 +95,8 @@ const DATA = /*{{data}}*/;
 
 // a refresh reloads the page, which the server builds afresh from the model;
 // the layout, view, search and open panel are carried across in sessionStorage
-const KEPT = (() => { try { return JSON.parse(sessionStorage.getItem("reader-kept")); }
-                      catch { return null; } finally { sessionStorage.removeItem("reader-kept"); } })();
+const KEPT = (() => { try { return JSON.parse(sessionStorage.getItem("kioku-kept")); }
+                      catch { return null; } finally { sessionStorage.removeItem("kioku-kept"); } })();
 
 // R → an ochre → green → teal → blue ramp, faint to strong against the surface.
 // Half of it goes to R .5–.7 and .7–1 each, where the distinctions matter, so
@@ -128,7 +128,7 @@ function hex([L, a, b]) {
 const dark = matchMedia("(prefers-color-scheme: dark)");
 let T = {}, RAMP = [];
 function theme() {
-  const set = localStorage.getItem("reader-theme");
+  const set = localStorage.getItem("kioku-theme");
   if (set) document.documentElement.dataset.theme = set;
   else delete document.documentElement.dataset.theme;
   const mode = T.mode = set || (dark.matches ? "dark" : "light");
@@ -144,7 +144,7 @@ theme();
 dark.addEventListener("change", theme);
 document.getElementById("theme").onclick = () => {
   const now = document.documentElement.dataset.theme || (dark.matches ? "dark" : "light");
-  localStorage.setItem("reader-theme", now === "dark" ? "light" : "dark");
+  localStorage.setItem("kioku-theme", now === "dark" ? "light" : "dark");
   theme();
 };
 const C = k => T[k.replace(/^--/, "")];
@@ -404,8 +404,8 @@ function load(at = {}) {
 }
 document.getElementById("orphans").onchange = () => { G._fitted = false; load(); };
 document.getElementById("shade").onchange = e => {
-  try { localStorage.setItem("reader-shade", e.target.checked ? "1" : "0"); } catch {} };
-try { document.getElementById("shade").checked = localStorage.getItem("reader-shade") !== "0"; } catch {}
+  try { localStorage.setItem("kioku-shade", e.target.checked ? "1" : "0"); } catch {} };
+try { document.getElementById("shade").checked = localStorage.getItem("kioku-shade") !== "0"; } catch {}
 if (KEPT) {
   document.getElementById("orphans").checked = KEPT.orphans;
   G._fitted = true;  // keep their view rather than zooming to fit
@@ -420,7 +420,7 @@ function reload() {
   if (!DATA.live) return;
   const at = {};
   for (const n of G.graphData().nodes) if (n.x != null) at[n.id] = [n.x, n.y];
-  sessionStorage.setItem("reader-kept", JSON.stringify({ at, centre: G.centerAt(),
+  sessionStorage.setItem("kioku-kept", JSON.stringify({ at, centre: G.centerAt(),
     zoom: G.zoom(), selected, q: q.value, orphans: document.getElementById("orphans").checked }));
   location.reload();
 }
@@ -455,7 +455,7 @@ function answers(list) {
   if (!list.length) return `<p style="color:var(--muted)">No answers yet.</p>`;
   return `<ul>${list.slice().reverse().map(a =>
     `<li><span class="grade">${a.at} ${esc(a.grade)}${a.conf != null ? " · " + a.conf : ""}</span>
-     ${a.flag === "mis" ? '<span class="mis">misconception</span>' : a.flag === "unseen" ? "never met" : ""}
+     ${a.flag === "mis" ? '<span class="mis">misconception</span>' : a.flag === "unseen" ? "never met" : a.flag === "pre" ? "before teaching" : ""}
      <span class="id">${esc(a.kind)} ${esc(a.ask)}</span><br>${esc(a.note)}</li>`).join("")}</ul>`;
 }
 function stats(x) {

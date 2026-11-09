@@ -1,4 +1,4 @@
-"""The memory model: one id's answers → the chance the reader recalls it now.
+"""The memory model: one id's answers → the chance the learner recalls it now.
 
 FSRS-6 with the py-fsrs 6.x default parameters, run on elapsed time in
 fractional days rather than whole calendar days, so recall also falls within the
@@ -35,8 +35,10 @@ def recall(answers: list[Answer], now: dt.datetime) -> Recall:
 
     FSRS assumes the item was relearned after a miss. Seeing the right answer
     is not evidence, so a wrong last answer holds R at 0 until a right one.
+    An answer given before the idea was taught (flag `pre`) is kept as data
+    but is not evidence of memory, so it is left out.
     """
-    answers = sorted(answers, key=lambda a: a.at)  # stable: file order at equal times
+    answers = sorted((a for a in answers if a.flag != "pre"), key=lambda a: a.at)  # stable: file order at equal times
     last = answers[-1] if answers else None
     graded = [(_days(a.at), GRADE[a.grade]) for a in answers if a.grade in GRADE]
     if not graded:

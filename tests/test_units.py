@@ -1,7 +1,7 @@
 import datetime as dt
 
-from reader import memory, questions
-from reader.records import Answer
+from kioku import memory, questions
+from kioku.records import Answer
 
 NOW = dt.datetime(2026, 11, 2, 12, 0)
 DAY = dt.timedelta(days=1)
@@ -56,7 +56,7 @@ def test_a_guess_is_recorded_but_not_graded():
 
 
 def test_evidence_lines_carry_the_time_and_old_ones_read_as_noon():
-    from reader.store import format_answer, parse_answer
+    from kioku.store import format_answer, parse_answer
     a = answer("good", dt.datetime(2026, 11, 3, 9, 41))
     line = format_answer(a)
     assert line.startswith("- 2026-11-03T09:41 p_aaaa pick good ")
@@ -116,8 +116,8 @@ def test_parse_reply_reads_thoughts():
 
 
 def test_idea_blocks_round_trip():
-    from reader.store import format_area, parse_area
-    from reader.records import Idea
+    from kioku.store import format_area, parse_area
+    from kioku.records import Idea
     ideas = [Idea("p_a1b2", "banach", "result", "maths/analysis", "a contraction has one fixed "
                   "point", ("contraction",), (), ("Banach fixed point",), "0ezz"),
              Idea("i_c3d4", "banach-proof", "proof", "maths/analysis", "iterate; Cauchy",
@@ -129,9 +129,9 @@ def test_idea_blocks_round_trip():
 
 
 def test_edges_and_cycles():
-    from reader.model import Model
-    from reader.records import Idea
-    from reader.store import Snapshot
+    from kioku.model import Model
+    from kioku.records import Idea
+    from kioku.store import Snapshot
     ideas = {i.id: i for i in (
         Idea("i_a", "a", "definition", "x", "s"),
         Idea("i_b", "b", "result", "x", "s", needs=("a",)),

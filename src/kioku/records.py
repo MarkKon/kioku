@@ -43,7 +43,7 @@ class Answer:
     ask: str  # the question block (or observed record), q_…
     n: int  # the item's number in its block
     conf: int | None = None  # their confidence digit, for a pick
-    flag: str | None = None  # mis: shows a misconception; unseen: never met it
+    flag: str | None = None  # mis: a misconception; unseen: never met it; pre: before teaching
     depth: str | None = None  # what the question demanded: state, use, transfer
     note: str = ""
 

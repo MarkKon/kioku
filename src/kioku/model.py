@@ -108,7 +108,7 @@ class Model:
                       and (not area or a.startswith(area + "/")))
 
     def coverage(self, ids: list[str]) -> Coverage:
-        asked = [i for i in ids if self.answers_for(i)]
+        asked = [i for i in ids if any(a.flag != "pre" for a in self.answers_for(i))]
         last = max((a.at for i in asked for a in self.answers_for(i)), default=None)
         return Coverage(len(ids), len(asked), last)
 

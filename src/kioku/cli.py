@@ -1,4 +1,4 @@
-"""reader: what a reader has shown they know, as recall probabilities.
+"""kioku: what a learner has shown they know, as recall probabilities.
 
 The loop: look ideas up (`context`), ask what the lookup does not settle
 (`ask`), and pass the reply on (`answer`), which records it at once. Evidence
@@ -49,7 +49,7 @@ class Context:
 
 
 def die(msg: str) -> NoReturn:
-    print(f"reader: {msg}", file=sys.stderr)
+    print(f"kioku: {msg}", file=sys.stderr)
     sys.exit(1)
 
 
@@ -61,7 +61,7 @@ def stdin_text(required: bool) -> str:
     """What was piped in: a heredoc or a file. Never waits on a terminal."""
     if sys.stdin is None or sys.stdin.isatty():
         if required:
-            die("pipe the ideas in, e.g. `reader add <<'EOF'` … `EOF`")
+            die("pipe the ideas in, e.g. `kioku add <<'EOF'` … `EOF`")
         return ""
     if not required and not select.select([sys.stdin], [], [], 0.2)[0]:
         return ""
@@ -112,7 +112,7 @@ def coverage_line(m: Model, ids: list[str]) -> str:
 
 def warn(m: Model):
     if m.problems:
-        print(f"({len(m.problems)} problem(s) in the model files; `reader upkeep --check`)",
+        print(f"({len(m.problems)} problem(s) in the model files; `kioku upkeep --check`)",
               file=sys.stderr)
 
 
@@ -122,19 +122,19 @@ def cmd_init(ctx: Context, a):
     ctx.store.init()
     if shutil.which("git") and not (ctx.cfg.home / ".git").exists():
         subprocess.run(["git", "init", "-q", str(ctx.cfg.home)], check=False)
-    print(f"reader: model in {ctx.cfg.home}; describe the reader in profile.md")
+    print(f"kioku: model in {ctx.cfg.home}; describe the learner in profile.md")
 
 
 def cmd_profile(ctx: Context, a):
     text = ctx.store.profile()
     if text is None:
-        die(f"no profile yet; `reader init`, then describe the reader in {ctx.cfg.home}/profile.md")
+        die(f"no profile yet; `kioku init`, then describe the learner in {ctx.cfg.home}/profile.md")
     print(text.strip())
 
 
 def cmd_context(ctx: Context, a):
     m, terms = ctx.model, terms_of(a.what)
-    print(f"reader context · {ctx.cfg.now:%Y-%m-%d %H:%M} · {LEGEND}")
+    print(f"kioku context · {ctx.cfg.now:%Y-%m-%d %H:%M} · {LEGEND}")
     if not terms:
         show_tree(m)
     for t in terms:
@@ -247,7 +247,7 @@ def graph_page(ctx: Context, terms: list[str], depth: int, live: bool) -> str:
         data = view.graph(m, view.around(m, seeds, depth), seeds)
     else:
         data = view.graph(m)
-    return view.html(data, "reader · " + (", ".join(terms) or "everything"), live)
+    return view.html(data, "kioku · " + (", ".join(terms) or "everything"), live)
 
 
 def cmd_graph(ctx: Context, a):
@@ -475,7 +475,7 @@ def cmd_ask(ctx: Context, a):
     for it in items:
         j = m.resolve(it["id"])
         if j is None:
-            problems.append(f"item {it['n']}: unknown idea {it['id']} (add it with `reader add`)")
+            problems.append(f"item {it['n']}: unknown idea {it['id']} (add it with `kioku add`)")
         else:
             it["id"], it["name"] = j, m.ideas[j].name
     if problems:
@@ -487,7 +487,7 @@ def cmd_ask(ctx: Context, a):
 
 def open_ask(ctx: Context, qid: str) -> dict:
     if not re.fullmatch(QID, qid):
-        die(f"`{qid}` is not a block id; `reader ask` prints one (q_…)")
+        die(f"`{qid}` is not a block id; `kioku ask` prints one (q_…)")
     ask = ctx.store.ask(qid)
     if ask is None:
         die(f"no question block {qid}")
@@ -551,7 +551,7 @@ def cmd_answer(ctx: Context, a):
         waiting = [w for w in waiting if w != n]
     ctx.store.save_ask(ask)
     print("\n".join(shown))
-    notes = [f"grade {n}: reader answer {ask['id']} --say {n}=good|hard|again "
+    notes = [f"grade {n}: kioku answer {ask['id']} --say {n}=good|hard|again "
              f"[--mis 'believed X → Y']" for n in waiting]
     if recorded:
         notes.append(f"{recorded} answer(s) recorded")
@@ -566,7 +566,7 @@ def cmd_observed(ctx: Context, a):
         name, _, grade = spec.rpartition("=")
         j = m.resolve(name)
         if j is None:
-            die(f"no idea `{name}` (add it with `reader add`)")
+            die(f"no idea `{name}` (add it with `kioku add`)")
         if grade not in ("again", "hard", "good"):
             die(f"`{spec}`: observed work is graded good, hard or again")
         pairs.append((j, grade))
@@ -609,18 +609,95 @@ def cmd_upkeep(ctx: Context, a):
 
 
 # --------------------------------------------------------------------------
+# The formats live here, in the help, so the skills point at them instead of
+# repeating them.
+
+ASK_FORMAT = """\
+A block, on stdin or in a file:
+
+  # <title>
+  <n> pick|write|say <idea> [state|use|transfer] [pre]: <question>
+    * <the right option>                         pick: exactly one
+    - <a wrong option> :: <the misconception a confident pick of it shows>
+    ? <explanation, shown with the verdict>
+    = <reference answer>                         write and say
+
+<idea> is a name, alias or id. The depth is what the item demands: state (recall
+it), use (apply it when named, the default), transfer (reach for it where nothing
+points to it). pre: asked before the idea is taught; the answer is kept but is
+not evidence of memory. At most six items.
+
+Replies, all items on one line, e.g. `1b8 2. 3: the variance shrinks`:
+  pick   a letter and a confidence digit: `1b8` (option b, 80% sure)
+  write  `2.` once written; then `2=` right, `2~` a slip, `2x` wrong
+  say    `3: <free text>`; grade it with `kioku answer <q_id> --say 3=good`
+  any    `4-` never met it, `4?` seen it but cannot produce it
+
+The block is stored with its key and printed with its id, options shuffled.
+The learner never sees tool output: copy the printed block into your reply.
+
+Example:
+  kioku ask <<'EOF'
+  # girsanov
+  1 pick girsanov: Under $Q$ with $dQ/dP = e^{\\theta W_T - \\theta^2 T/2}$, $W_t - \\theta t$ is
+    * a $Q$-Brownian motion
+    - a $Q$-martingale but not a Brownian motion :: keeps only the martingale property
+    - a $P$-Brownian motion
+    ? Under $Q$ the drift is removed and the quadratic variation kept.
+  2 say girsanov-proof: In one line, where does the drift come from?
+    = Itô on the density gives $dZ = \\theta Z\\,dW$, which shifts $W$ by $\\theta\\,dt$ under $Q$.
+  EOF
+"""
+
+ANSWER_FORMAT = """\
+Grades: again (wrong or blank), hard (right with effort or a slip), good (right
+and clean), easy (right and carried to a new setting). A right pick at chance
+confidence is a guess: recorded, no grade. A reply outside the format ("between
+a and b", a letter without a digit) is yours to settle with the learner first.
+"""
+
+ADD_FORMAT = """\
+Ideas on stdin, one block each:
+
+  ## <name> · <kind> · <area>
+  <statement: what a right answer must match; may span lines>
+  - needs: <name>, …      ideas it cannot be followed without
+  - uses: <name>, …       ideas that doing it, or answering on it, carries out
+  - aliases: <other names>
+  - vault: <note id>      the note in the notes folder that states it
+
+name: kebab-case, unique, no "and". kind: definition | result | proof | method.
+area: a path such as maths/analysis. The edge lines are optional; an edge may
+name an idea added earlier in the same input. Refuses, and shows what it found:
+a name or close statement that exists (--anyway), an edge to an unknown idea, an
+unknown area (--new-area), an edge that closes a cycle.
+"""
+
+OBSERVED_FORMAT = """\
+One call per step, after its tests pass, for each idea the step exercised:
+  good   done clean from the brief and its materials
+  hard   needed help beyond the brief, or a slip
+  again  handed the answer
+An idea taught within the same step gets no grade.
+
+Example:
+  kioku observed register-buffer=hard tensor-broadcasting=good \\
+    --step "3 · causal head" --note "register-buffer: needed the device demo"
+"""
+
 
 def parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="reader", description=(__doc__ or "").split("\n\n")[0])
+    ap = argparse.ArgumentParser(prog="kioku", description=(__doc__ or "").split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    def add(name, fn, help_):
-        sp = sub.add_parser(name, help=help_, description=help_)
+    def add(name, fn, help_, epilog=None):
+        sp = sub.add_parser(name, help=help_, description=help_, epilog=epilog,
+                            formatter_class=argparse.RawDescriptionHelpFormatter)
         sp.set_defaults(fn=fn)
         return sp
 
     add("init", cmd_init, "create the model folder, its profile and its git repo")
-    add("profile", cmd_profile, "who the reader is")
+    add("profile", cmd_profile, "who the learner is")
     sp = add("context", cmd_context, "look up an area, ideas or terms (comma-separated); "
              "no argument: the top of the area tree")
     sp.add_argument("what", nargs="*")
@@ -633,8 +710,7 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--port", type=int, default=0, help="port to serve on (default: any free)")
     sp.add_argument("--no-open", action="store_true", help="do not open a browser")
 
-    sp = add("add", cmd_add, "add ideas from stdin: `## name · kind · area`, the statement, "
-             "then `- needs: …`, `- uses: …`, `- aliases: …`, `- vault: …`; prints their ids")
+    sp = add("add", cmd_add, "add ideas from stdin; prints their ids", ADD_FORMAT)
     sp.add_argument("--anyway", action="store_true", help="add despite a likely duplicate")
     sp.add_argument("--new-area", action="store_true", help="make an area that does not exist")
     sp = add("edit", cmd_edit, "change ideas (comma-separated names); a new statement on stdin")
@@ -651,10 +727,11 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("name")
     sp.add_argument("--why", help="kept with the archived answers")
 
-    sp = add("ask", cmd_ask, "store a question block (file or stdin), print it shuffled with its id")
+    sp = add("ask", cmd_ask, "store a question block (file or stdin), print it shuffled with its id",
+             ASK_FORMAT)
     sp.add_argument("file", nargs="?")
-    sp = add("answer", cmd_answer, "grade the reader's one-line reply to a block and record it "
-             "now; also grade say items, regrade, retract")
+    sp = add("answer", cmd_answer, "grade the learner's one-line reply to a block and record it "
+             "now; also grade say items, regrade, retract", ANSWER_FORMAT)
     sp.add_argument("ask", help="the block id, q_…")
     sp.add_argument("reply", nargs="*")
     sp.add_argument("--redo", action="store_true",
@@ -668,7 +745,7 @@ def parser() -> argparse.ArgumentParser:
                     help="set an answer aside (misread, misclick); the item opens again")
     sp.add_argument("--why", help="why a retracted answer does not count")
     sp = add("observed", cmd_observed, "record a step of verified pairing work: "
-             "name=good|hard|again for each idea it exercised")
+             "name=good|hard|again for each idea it exercised", OBSERVED_FORMAT)
     sp.add_argument("ideas", nargs="+", metavar="NAME=GRADE")
     sp.add_argument("--step", required=True, help="the step, e.g. '3 · causal head'")
     sp.add_argument("--note", action="append",

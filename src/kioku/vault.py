@@ -1,4 +1,4 @@
-"""An optional vault: a folder of markdown notes the reader wrote. Read, never written.
+"""An optional vault: a folder of markdown notes the learner wrote. Read, never written.
 
 Notes live in `<vault>/notes/*.md`, with YAML frontmatter. A note's title is
 its first alias (or its first heading, or its file name); `status: developed`

@@ -1,6 +1,6 @@
 """The model on disk: one folder of plain files, readable and diffable.
 
-  profile.md   who the reader is, free text for agents
+  profile.md   who the learner is, free text for agents
   config.toml  optional settings (see config.py)
   areas/       the area tree: the ideas whose home is maths/analysis live in
                areas/maths/analysis.md, one `## name · kind · id` block each
@@ -32,12 +32,18 @@ FIELDS = ("needs", "uses", "aliases", "vault")
 
 HEADERS = {
     "evidence.md": "# Evidence\n\n"
-    "<!-- One line per answer, written by `reader answer` and `reader observed`:\n"
-    "     - YYYY-MM-DDTHH:MM <id> pick|write|say|observed <grade> [confidence] [mis|unseen]"
+    "<!-- One line per answer, written by `kioku answer` and `kioku observed`:\n"
+    "     - YYYY-MM-DDTHH:MM <id> pick|write|say|observed <grade> [confidence] [mis|unseen|pre]"
     " [state|use|transfer] q_<ask>/<n> — <what they answered> -->\n\n",
-    "profile.md": "# Reader profile\n\n"
-    "<!-- Who the reader is, for agents pitching explanations at their level. -->\n\n"
-    "Name:\n\nBackground:\n\nHow they answer:\n",
+    "profile.md": "# Learner profile\n\n"
+    "<!-- Who the learner is. Every agent reads this once per session (`kioku profile`)\n"
+    "     to pitch its work at their level. Free text: fill in what helps, delete the rest. -->\n\n"
+    "Name:\n\n"
+    "Background: <what they studied or work on; what is likely held but not yet recorded>\n\n"
+    "How they answer: <typing, paper or tablet for formulas (write items), voice (say items)>\n\n"
+    "Notation: <conventions to use, in maths or code>\n\n"
+    "Notes: <where their own notes are, and whether agents may write there>\n\n"
+    "Sessions: <usual length; how they like lessons and pairing paced>\n",
 }
 
 ARCHIVE_HEADER = ("# Archive\n\nNot evidence: lines set aside, e.g. the answers of removed ideas. "
@@ -48,7 +54,7 @@ ANSWER_RE = re.compile(
     r" (?P<kind>pick|write|say|observed)"
     r" (?P<grade>again|hard|good|easy|guess)"
     r"(?: (?P<conf>[0-9]))?"
-    r"(?: (?P<flag>mis|unseen))?"
+    r"(?: (?P<flag>mis|unseen|pre))?"
     r"(?: (?P<depth>" + "|".join(DEPTHS) + r"))?"
     r" (?P<ask>" + QID + r")/(?P<n>\d+)"
     r"(?:\s+—\s*(?P<note>.*))?\s*$")
@@ -253,7 +259,7 @@ class Store:
         return answers
 
 
-# -- the idea block: the one format of area files, `reader add` and `reader context`
+# -- the idea block: the one format of area files, `kioku add` and `kioku context`
 
 def parse_blocks(text: str, where: str, problems: list[str], need_id: bool = True) -> list[dict]:
     """`## name · kind · id-or-area` blocks → dicts with name, kind, third, statement,

@@ -1,7 +1,7 @@
 """One-off: a v0 model folder (props.md, chains.md) → a v1 one (areas/).
 
-  python -m reader.migrate skeleton <v0-home> [--map topics.txt] > migration.md
-  python -m reader.migrate apply <v0-home> <migration.md> <new-home> [--check]
+  python -m kioku.migrate skeleton <v0-home> [--map topics.txt] > migration.md
+  python -m kioku.migrate apply <v0-home> <migration.md> <new-home> [--check]
 
 The skeleton lists every v0 id once, as a line of the table to fill in:
 
@@ -18,7 +18,7 @@ writes the new folder: area files, evidence with observed work marked as such,
 and everything else copied as it is (asks, archive, profile, config, .git).
 With --check it only reports.
 
-The topic map (`--map`) belongs to the reader's data, not to this code: lines
+The topic map (`--map`) belongs to the learner's data, not to this code: lines
 `topic = area`, or `topic+topic = area` for a combination, most specific first.
 """
 
@@ -100,7 +100,7 @@ def skeleton(home: Path, map_path: Path | None) -> str:
         return next((a for need, a in rules if need <= set(topics)), "?")
 
     out = ["# migration table", "",
-           "<!-- one line per v0 id; see `python -m reader.migrate -h` -->", ""]
+           "<!-- one line per v0 id; see `python -m kioku.migrate -h` -->", ""]
     for p in props.values():
         into = [c for c in chains.values() if c["conclusion"] == p["id"]]
         needs = sorted({props[x]["name"] if x in props else x for c in into for x in c["premises"]})
@@ -251,7 +251,7 @@ def apply(home: Path, table: Path, out: Path, check: bool) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="python -m reader.migrate", description=__doc__,
+    ap = argparse.ArgumentParser(prog="python -m kioku.migrate", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sk = sub.add_parser("skeleton")

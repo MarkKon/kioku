@@ -22,11 +22,11 @@ from .text import norm
 from .vault import Vault
 
 SCOUT_PROMPT = """You are a read-only scout for an agent that models what one
-reader knows. You work in their vault, a folder of markdown notes:
+learner knows. You work in their vault, a folder of markdown notes:
 notes/<id>.md, with YAML frontmatter (`aliases:` holds the title, `status:`
 stub/wip/developed) and links [[id|label]]. Never create, edit or move any
 file. Search with grep and find, read what you need, and answer tersely. When
-asked for ideas, give each as a block for `reader add`:
+asked for ideas, give each as a block for `kioku add`:
 
   ## <kebab-case-name> · definition|result|proof|method · <area, e.g. maths/analysis>
   <the statement, LaTeX in $…$, readable alone>
@@ -124,16 +124,16 @@ def calibration(m: Model) -> dict[int, tuple[int, float]]:
     """Confidence digit → (picks, share right)."""
     bins: dict[int, list[bool]] = {}
     for a in m.answers:
-        if a.kind == "pick" and a.conf is not None and a.flag != "unseen":
+        if a.kind == "pick" and a.conf is not None and a.flag not in ("unseen", "pre"):
             bins.setdefault(a.conf, []).append(a.grade != "again")
     return {c: (len(xs), sum(xs) / len(xs)) for c, xs in sorted(bins.items())}
 
 
 def scout(cfg: Config, task: str, timeout: int) -> str:
     if not cfg.vault:
-        raise RuntimeError("no vault configured (READER_VAULT or vault in config.toml)")
+        raise RuntimeError("no vault configured (KIOKU_VAULT or vault in config.toml)")
     if not cfg.scout_model:
-        raise RuntimeError("no scout model configured (READER_SCOUT_MODEL or scout_model)")
+        raise RuntimeError("no scout model configured (KIOKU_SCOUT_MODEL or scout_model)")
     if not shutil.which("pi"):
         raise RuntimeError("the scout needs pi, which is not installed")
     cmd = ["pi", "-p", "--no-session", "--no-skills", "--no-context-files",
@@ -153,7 +153,7 @@ def run(cfg: Config, store: Store, m: Model, vault: Vault | None,
     """The daily pass: check, back up, duplicates, areas to split, calibration, and vault
     notes still without ideas."""
     store.init()
-    report = [f"# reader upkeep · {cfg.today}"]
+    report = [f"# kioku upkeep · {cfg.today}"]
     problems = lint(store, m, vault)
     report.append("problems:\n" + "\n".join(problems) if problems
                   else f"check: ok · {len(m.ideas)} ideas, {len(m.areas)} areas, "
@@ -164,7 +164,7 @@ def run(cfg: Config, store: Store, m: Model, vault: Vault | None,
         report.append("likely duplicates (merge by hand):\n" + "\n".join(d))
     s = to_split(m)
     if s:
-        report.append("areas to consider splitting (`reader edit a,b,c --area <new> "
+        report.append("areas to consider splitting (`kioku edit a,b,c --area <new> "
                       "--new-area`):\n" + "\n".join(s))
     bins = calibration(m)
     if bins:
