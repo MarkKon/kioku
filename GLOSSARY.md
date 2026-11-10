@@ -118,6 +118,12 @@ _Avoid_: grade, score, rating
 What a step of observed work took: done alone, with a hint, or shown the
 answer.
 
+**Probe**:
+A question marked as asked to find out what the learner already held, before
+any teaching; a right answer to it is read as knowledge from before the
+record.
+_Avoid_: pretest, diagnostic (as a noun)
+
 **Confidence**:
 The digit a learner puts on a pick; the memory model reads it against their
 own share of right picks at that digit.

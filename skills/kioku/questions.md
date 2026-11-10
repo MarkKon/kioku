@@ -34,9 +34,11 @@ There are three kinds:
   $=$, $\le$ is not a wrong option).
 - Solve the item yourself, from the definitions as stated, before asking.
 - Prefer an item that applies an idea to one that recites it.
+- An item asked to find out what they already hold, before any teaching, is
+  tagged `probe`: a right answer counts as knowledge they had before, and
+  lasts longer in the model the surer it was.
 - An item on an idea this session has already explained or corrected is
-  tagged `taught`: the answer counts, and the mark tells what was learned
-  today from what was held before.
+  tagged `taught`. A case they work out themselves carries no tag.
 - An item asked before its idea is taught, only to see what they would guess,
   is tagged `pre`: its answer is kept as data and does not count as evidence.
 - An idea with no entry is added by the block that asks about it: write its

@@ -19,10 +19,11 @@ from .text import short
 
 # `1 pick banach-fixed-point use: …`: the item's idea (name, alias or id), optionally
 # the depth it demands (default use), and optionally `pre` (asked before the idea is
-# taught, so its answer is kept as data but is not evidence of memory) or `taught` (the
-# session explained the idea before this question; recorded with the answer)
+# taught, so its answer is kept as data but is not evidence of memory), `taught` (the
+# session explained the idea before this question) or `probe` (asked to find out what
+# they already held); the last two are recorded with the answer
 ITEM_RE = re.compile(r"^(\d+)\s+(pick|write|say)\s+([^\s:]+)(?:\s+(" + "|".join(DEPTHS)
-                     + r"))?(?:\s+(pre|taught))?:\s*(.*)$")
+                     + r"))?(?:\s+(pre|taught|probe))?:\s*(.*)$")
 
 
 def split_ideas(text: str) -> tuple[str, str]:
@@ -52,7 +53,8 @@ def parse_block(text: str) -> tuple[str, list[dict], list[str]]:
         m = ITEM_RE.match(line)
         if m:
             items.append({"n": int(m[1]), "kind": m[2], "id": m[3], "depth": m[4] or "use",
-                          "pre": m[5] == "pre", "taught": m[5] == "taught", "q": m[6],
+                          "pre": m[5] == "pre", "taught": m[5] == "taught",
+                          "probe": m[5] == "probe", "q": m[6],
                           "options": [], "why": "", "ref": ""})
             continue
         if not items:
@@ -144,7 +146,8 @@ def grade_say(ask: dict, n: int, outcome: str, now: dt.datetime, mis: str | None
         or "graded by the agent"
     flag = "pre" if it.get("pre") else "mis" if mis else None
     return Answer(now, it["id"], it["kind"], outcome, ask["id"], n,
-                  flag=flag, depth=it.get("depth"), note=text, taught=bool(it.get("taught")))
+                  flag=flag, depth=it.get("depth"), note=text, taught=bool(it.get("taught")),
+                  probe=bool(it.get("probe")))
 
 
 def parse_reply(reply: str, n_items: int) -> list[tuple[int, str, str]]:
@@ -179,7 +182,7 @@ def _grade_item(qid: str, it: dict, tok: str, thoughts: str,
         if it.get("pre"):  # before teaching: kept as data, skipped by the memory model
             flag = "pre"
         return Answer(now, it["id"], kind, outcome, qid, n, conf, flag, it.get("depth"),
-                      note + said, bool(it.get("taught")))
+                      note + said, bool(it.get("taught")), probe=bool(it.get("probe")))
 
     if tok == "-":
         return "never met", answer("unmet", "never met it"), True

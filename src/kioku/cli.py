@@ -754,7 +754,8 @@ def cmd_log(ctx: Context, a):
                 what = " ".join(x for x in (
                     ans.outcome, "" if ans.conf is None else str(ans.conf), ans.help or "",
                     ans.flag or "",
-                    ans.depth or "", "taught" if ans.taught else "") if x)
+                    ans.depth or "", "taught" if ans.taught else "probe" if ans.probe else "")
+                    if x)
                 what += f" — {short(ans.note, 70)}" if ans.note else ""
             print(f"  {it['n']:>2} {m.name(it['id']):<{w}}  {it['kind']:<8} {what}")
     if waiting:
@@ -799,7 +800,7 @@ ASK_FORMAT = """\
 A block, on stdin or in a file:
 
   # <title>
-  <n> pick|write|say <idea> [state|use|transfer] [pre|taught]: <question>
+  <n> pick|write|say <idea> [state|use|transfer] [pre|taught|probe]: <question>
     * <the right option>                         pick: exactly one
     - <a wrong option> :: <the misconception a confident pick of it shows>
     ? <explanation, shown with the verdict>
@@ -809,8 +810,10 @@ A block, on stdin or in a file:
 it), use (apply it when named, the default), transfer (reach for it where nothing
 points to it). pre: asked before the idea is taught; the answer is kept but is
 not evidence of memory. taught: the session explained the idea before this
-question (a worked example, a correction); the answer counts and is marked, so
-what was learned today can be told from what was held before.
+question (a worked example, a correction). probe: asked to find out what they
+already held, before any teaching; a right answer then counts as knowledge
+they had before, and lasts longer in the model the surer it was. Both marks
+are recorded with the answer.
 
 Ideas the block asks about that have no entry yet can be added in the same
 call: put their blocks (`## name · kind · area`, see `kioku add -h`) above the

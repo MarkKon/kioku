@@ -111,4 +111,4 @@ def _recall(m: Model, iid: str) -> dict:
 
 def _answer(a: Answer) -> dict:
     return {"at": f"{a.at:%Y-%m-%d %H:%M}", "kind": a.kind, "outcome": a.outcome, "help": a.help,
-            "conf": a.conf, "flag": a.flag, "depth": a.depth, "taught": a.taught, "note": a.note, "ask": f"{a.ask}/{a.n}"}
+            "conf": a.conf, "flag": a.flag, "depth": a.depth, "taught": a.taught, "probe": a.probe, "note": a.note, "ask": f"{a.ask}/{a.n}"}

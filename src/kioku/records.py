@@ -52,6 +52,7 @@ class Answer:
     note: str = ""
     taught: bool = False  # the session explained the idea before this question
     help: str | None = None  # hint or shown; None: without help
+    probe: bool = False  # asked to find out what they already held, before any teaching
 
     @property
     def right(self) -> bool:

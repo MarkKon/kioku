@@ -35,7 +35,7 @@ HEADERS = {
     "<!-- One line per answer, written by `kioku answer`, `kioku observed` and `kioku unmet`:\n"
     "     - YYYY-MM-DDTHH:MM <id> pick|write|say|observed|triage right|partly|wrong|unmet|guess [confidence]"
     " [hint|shown] [mis|pre]"
-    " [state|use|transfer] [taught] q_<ask>/<n> — <what they answered> -->\n\n",
+    " [state|use|transfer] [taught|probe] q_<ask>/<n> — <what they answered> -->\n\n",
     "profile.md": "# Learner profile\n\n"
     "<!-- Who the learner is. Every agent reads this once per session (`kioku profile`)\n"
     "     to pitch its work at their level. Free text: fill in what helps, delete the rest. -->\n\n"
@@ -58,7 +58,7 @@ ANSWER_RE = re.compile(
     r"(?: (?P<help>hint|shown))?"
     r"(?: (?P<flag>mis|unseen|pre))?"
     r"(?: (?P<depth>" + "|".join(DEPTHS) + r"))?"
-    r"(?: (?P<taught>taught))?"
+    r"(?: (?P<mark>taught|probe))?"
     r" (?P<ask>" + QID + r")/(?P<n>\d+)"
     r"(?:\s+—\s*(?P<note>.*))?\s*$")
 HEAD_RE = re.compile(r"^## (?P<name>\S+) · (?P<kind>\S+) · (?P<third>\S+)\s*$")
@@ -270,7 +270,7 @@ class Store:
             a = parse_answer(line)
             if a is None:
                 problems.append(f"evidence.md:{n}: want `- YYYY-MM-DDTHH:MM <id> <kind> <outcome> "
-                                f"[conf] [hint|shown] [mis|pre] [depth] [taught] q_<ask>/<n> — note`")
+                                f"[conf] [hint|shown] [mis|pre] [depth] [taught|probe] q_<ask>/<n> — note`")
             elif a.outcome == "guess" and a.kind != "pick":
                 problems.append(f"evidence.md:{n}: only a pick can be a guess")
             else:
@@ -370,7 +370,8 @@ def parse_answer(line: str) -> Answer | None:
     outcome, help_, flag = _outcome(m["kind"], m["outcome"], m["help"], m["flag"])
     return Answer(at=at, id=m["id"], kind=m["kind"], outcome=outcome, ask=m["ask"],
                   n=int(m["n"]), conf=int(m["conf"]) if m["conf"] else None, flag=flag,
-                  depth=m["depth"], note=m["note"] or "", taught=bool(m["taught"]), help=help_)
+                  depth=m["depth"], note=m["note"] or "", taught=m["mark"] == "taught",
+                  help=help_, probe=m["mark"] == "probe")
 
 
 def _outcome(kind: str, word: str, help_: str | None,
@@ -400,8 +401,8 @@ def format_answer(a: Answer) -> str:
         parts.append(a.flag)
     if a.depth:
         parts.append(a.depth)
-    if a.taught:
-        parts.append("taught")
+    if a.taught or a.probe:
+        parts.append("taught" if a.taught else "probe")
     parts.append(f"{a.ask}/{a.n}")
     note = " ".join(a.note.split())
     return "- " + " ".join(parts) + (f" — {note}" if note else "")

@@ -766,7 +766,7 @@ function answers(list) {
   if (!list.length) return `<p style="color:var(--muted)">No answers yet.</p>`;
   return `<ul>${list.slice().reverse().map(a =>
     `<li><span class="grade">${a.at} ${esc(a.outcome === "unmet" ? "never met" : a.outcome)}${a.help ? " · " + esc(a.help) : ""}${a.conf != null ? " · " + a.conf : ""}</span>
-     ${a.flag === "mis" ? '<span class="mis">misconception</span>' : a.flag === "pre" ? "before teaching" : a.taught ? "after teaching" : ""}
+     ${a.flag === "mis" ? '<span class="mis">misconception</span>' : a.flag === "pre" ? "before teaching" : a.taught ? "after teaching" : a.probe ? "probe" : ""}
      <span class="id">${esc(a.kind)}${a.depth ? " · " + esc(a.depth) : ""} ${esc(a.ask)}</span><br>${esc(a.note)}</li>`).join("")}</ul>`;
 }
 function stats(x) {

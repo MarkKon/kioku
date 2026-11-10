@@ -85,7 +85,9 @@ Every turn keeps the model up to date. After the step's own questions, ask
 about other ideas:
 
 - **Probes**: what the next step builds on, where the model leaves it
-  unsettled (no answer, a low R, a wrong last answer).
+  unsettled (no answer, a low R, a wrong last answer). Tag each `probe`: it
+  is asked before any teaching, so a right answer is knowledge they had
+  before, and the model keeps it longer.
 - **Triage**: under the block, a lettered list of idea names with "which of
   these have you never met?". Record the marked ones with `kioku unmet`
   (`kioku unmet -h`), adding those that have no entry first. A name left

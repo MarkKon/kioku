@@ -441,11 +441,15 @@ today it is this:
   times in ten at 7 has their 7 read as nearly sure. Until their record at a
   digit is thick enough, the digit is taken at face value. A fixed threshold
   ("8 or more is solid") fits nobody in particular.
-- **A right first answer to an idea nobody taught them is old knowledge.** It
-  starts at thirty days of stability, where a card met today would start at
-  two. Without this, material held for years looked faded within a week and
-  was asked again and again. Thirty days is a placeholder: it should be fitted
-  on the learner's own later answers once there are enough.
+- **A right answer to a probe is old knowledge.** A probe is a question
+  marked as asked to find out what the learner already held, before any
+  teaching. A right first answer to one starts between two days of stability,
+  where a card met today would start, and thirty: the surer the answer, the
+  nearer thirty. Without this, material held for years looked faded within a
+  week and was asked again and again. The mark is explicit: an answer without
+  it, such as every answer from before the mark existed, starts where it
+  always did. Thirty days is a placeholder, to be fitted on the learner's own
+  later answers once there are enough.
 - **A slip, or help beyond the brief, counts for less** than a clean answer,
   and being handed the answer counts as a miss.
 
@@ -499,11 +503,11 @@ log below.
 - **Stop and teach, or note it and go on?** When a check finds a gap in the
   middle of a task, the agent can teach it now or flag it and carry on. Neither
   is right for every task.
-- **Knowledge that predates the record.** A right first answer to an idea
-  nobody taught now starts at thirty days of stability (principle 14). The
-  number is a placeholder: a learner's first ten days gave twelve later-day
-  answers after a right one, eleven of them right, which cannot tell thirty
-  days from a hundred.
+- **Knowledge that predates the record.** A right first answer to a probe now
+  starts at up to thirty days of stability (principle 14). The number is a
+  placeholder: a learner's first ten days gave twelve later-day answers after
+  a right one, eleven of them right, which cannot tell thirty days from a
+  hundred. Answers from before the mark existed are not helped by it.
 - **Fresh answers say little.** R now falls within the day (FSRS-6 on elapsed
   time), but only slightly: a clean first answer still reads about 0.98 eight
   hours later. Whether early learning needs a separate short-term memory
@@ -661,8 +665,11 @@ Newest last. Add an entry whenever a principle is added, changed or dropped.
   partly, wrong, never met; confidence; help), and the grades again, hard,
   good and easy are gone from the evidence, the commands and the skills. The
   memory model reads a pick's confidence against the learner's own record at
-  that digit, and starts a right first answer to an untaught idea at thirty
-  days of stability. Tried on a model of 286 answers: every old line reads as
-  the same answer, and of 131 ideas last answered right, those with R under
-  0.9 went from 106 to 20. Old lines are still read, and `kioku upkeep`
-  rewrites them.
+  that digit. A question can be marked `probe` (asked to find out what they
+  already held); a right first answer to one starts at up to thirty days of
+  stability, by how sure it was. Inferring old knowledge from the absence of a
+  `taught` mark was tried and dropped: old answers carry no marks, and many
+  of them were given at low confidence. Tried on a model of 286 answers:
+  every old line reads as the same answer. Old lines are still read, and
+  `kioku upkeep` rewrites them. `migrate.py`, the one-off move from v0 to v1,
+  is removed.

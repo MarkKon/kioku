@@ -73,14 +73,21 @@ def test_a_pick_counts_by_the_learners_own_record_at_its_digit():
     assert memory.quality(answer("right", help="hint"), {}) == memory.HARD
 
 
-def test_a_right_answer_to_an_idea_never_taught_is_old_knowledge():
+def test_a_right_answer_to_a_probe_is_old_knowledge():
     month = NOW + 30 * DAY
-    cold = memory.recall([answer("right", taught=False)], month)
-    fresh = memory.recall([answer("right", taught=True)], month)
-    assert cold.stability == memory.OLD and abs(cold.r - 0.9) < 1e-6
-    assert fresh.stability < 3 and fresh.r < cold.r
+    said = Answer(NOW, "p_aaaa", "say", "right", "q_test", 1, probe=True)
+    assert abs(memory.recall([said], month).stability - memory.OLD) < 1e-9
+    # unmarked, or marked taught, an answer starts where FSRS starts a new card
+    for plain in (answer("right", taught=False), answer("right", taught=True)):
+        assert memory.recall([plain], month).stability < 3
+    # the less sure the probe's answer, the less it counts as old knowledge
+    sure = memory.recall([answer("right", conf=9, taught=False, probe=True)], month)
+    unsure = memory.recall([answer("right", conf=4, taught=False, probe=True)], month)
+    slip = memory.recall([answer("partly", taught=False, probe=True)], month)
+    assert 3 > slip.stability and slip.stability < unsure.stability < sure.stability < memory.OLD
     # only a first answer starts there: one that follows a miss was learned here
-    relearned = memory.recall([answer("unmet", NOW - HOUR), answer("right", taught=False)], month)
+    relearned = memory.recall([answer("unmet", NOW - HOUR),
+                               answer("right", taught=False, probe=True)], month)
     assert relearned.stability < 3
 
 
@@ -94,6 +101,9 @@ def test_evidence_lines_say_what_happened_and_old_ones_still_read():
                   help="hint")
     assert format_answer(deep) == "- 2026-11-03T09:41 i_x1y2 observed right hint use q_test/2 — n"
     assert parse_answer(format_answer(deep)) == deep
+    probe = Answer(a.at, "p_aaaa", "pick", "right", "q_test", 3, conf=7, depth="use", probe=True)
+    assert format_answer(probe) == "- 2026-11-03T09:41 p_aaaa pick right 7 use probe q_test/3"
+    assert parse_answer(format_answer(probe)) == probe
     # lines from before 2026-11-10 carry a grade, and a date without a time reads as noon
     old = parse_answer("- 2026-11-02 p_aaaa pick good 8 q_test/1 — picked x")
     assert old.at == dt.datetime(2026, 11, 2, 12, 0) and (old.outcome, old.conf) == ("right", 8)

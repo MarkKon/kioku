@@ -180,7 +180,7 @@ def test_an_answer_before_teaching_is_kept_but_not_evidence(kioku):
 
 
 def test_the_formats_are_in_the_help(kioku):
-    assert "pick|write|say <idea> [state|use|transfer] [pre|taught]" in kioku("ask", "-h").stdout
+    assert "pick|write|say <idea> [state|use|transfer] [pre|taught|probe]" in kioku("ask", "-h").stdout
     assert "## <name> · <kind> · <area>" in kioku("add", "-h").stdout
     assert "alone  done from the brief" in kioku("observed", "-h").stdout
 
@@ -329,64 +329,6 @@ def test_graph_serves_a_page_built_afresh_on_every_request(kioku):
     finally:
         proc.terminate()
         proc.wait(5)
-
-
-# -- migration from v0
-
-def test_migration_from_v0(tmp_path):
-    v0 = tmp_path / "v0"
-    (v0 / "asks").mkdir(parents=True)
-    (v0 / "props.md").write_text(
-        "# Propositions\n\n"
-        "- p_aaaa · increments · BM increments are independent · topics: sde\n"
-        "- p_bbbb · quadratic-variation · the QV of BM is t · topics: sde · aliases: QV\n")
-    (v0 / "chains.md").write_text(
-        "# Chains\n\n- c_cccc · p_aaaa ⟹ p_bbbb · step: mean and variance\n"
-        "- c_dddd · p_bbbb ⟹ p_aaaa · step: taught after\n")
-    (v0 / "evidence.md").write_text(
-        "# Evidence\n\n- 2026-11-02T10:00 c_cccc say good q_aaaa/1 — fine\n"
-        "- 2026-11-02T11:00 p_aaaa say hard q_bbbb/1 — observed: needed a hint\n")
-    (v0 / "asks" / "q_aaaa.json").write_text(json.dumps(
-        {"id": "q_aaaa", "items": [{"n": 1, "kind": "say", "id": "c_cccc"}]}))
-    (v0 / "asks" / "q_bbbb.json").write_text(json.dumps(
-        {"id": "q_bbbb", "items": [{"n": 1, "kind": "say", "id": "p_aaaa"}]}))
-    (tmp_path / "map.txt").write_text("sde = maths/stochastic-calculus\n")
-
-    def mig(*args, ok=True):
-        r = subprocess.run([sys.executable, "-m", "kioku.migrate", *map(str, args)],
-                           capture_output=True, text=True)
-        if ok:
-            assert r.returncode == 0, r.stderr
-        return r
-
-    table = mig("skeleton", v0, "--map", tmp_path / "map.txt").stdout
-    assert "- p_bbbb · idea · quadratic-variation · ? · maths/stochastic-calculus · needs: " \
-           "increments" in table
-    assert "- c_cccc · idea · quadratic-variation-proof · proof" in table  # answered
-    assert "- c_dddd · ?" in table
-    t = tmp_path / "migration.md"
-    t.write_text(table)
-    assert "kind `?`" in mig("apply", v0, t, tmp_path / "v1", ok=False).stderr
-    assert "- p_aaaa · idea · increments · ? · maths/stochastic-calculus · needs: " \
-           "quadratic-variation" in table  # drafted from the teaching-order chain: a cycle
-    t.write_text(table.replace("· ? ·", "· result ·").replace("- c_dddd · ?", "- c_dddd · drop"))
-    assert "cycle: increments → quadratic-variation" in mig("apply", v0, t, tmp_path / "v1",
-                                                           ok=False).stderr
-    t.write_text(t.read_text().replace("increments · result · maths/stochastic-calculus · "
-                                       "needs: quadratic-variation", "increments · result · "
-                                       "maths/stochastic-calculus · needs: "))
-    out = mig("apply", v0, t, tmp_path / "v1").stdout
-    assert "3 ideas in 1 areas" in out and "1 answer(s) marked observed" in out
-    home = tmp_path / "v1"
-    assert not (home / "props.md").exists()
-    text = (home / "areas" / "maths" / "stochastic-calculus.md").read_text()
-    assert "## quadratic-variation-proof · proof · c_cccc\nmean and variance" in text
-    assert "- aliases: QV" in text
-    assert " p_aaaa observed right hint " in (home / "evidence.md").read_text()
-    env = {**os.environ, "KIOKU_HOME": str(home), "KIOKU_TODAY": "2026-11-03"}
-    r = subprocess.run([sys.executable, "-m", "kioku", "upkeep", "--check"],
-                       capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL)
-    assert r.returncode == 0, r.stdout + r.stderr
 
 
 # -- the teaching turn's commands

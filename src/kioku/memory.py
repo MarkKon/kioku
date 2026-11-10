@@ -14,9 +14,10 @@ An answer records what happened, not a grade. This module reads it as follows:
                  beyond the brief; for a pick, 2 plus the learner's own share of
                  right picks at that confidence digit; 3 otherwise
 
-A right first answer to an idea the session had not taught shows knowledge that
-predates the record. It starts at OLD days of stability, where FSRS would start
-a new card at about two.
+A right first answer marked `probe` (asked to find out what they already held)
+shows knowledge that predates the record. It starts between FSRS's own start,
+about two days, and OLD days of stability: the surer the answer, the nearer OLD.
+The `taught` mark is recorded for a later model and not read here.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ W = (0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722,
 DECAY = -W[20]
 FACTOR = 0.9 ** (1 / DECAY) - 1
 LAPSE, HARD, GOOD = 1.0, 2.0, 3.0
-OLD = 30.0  # days of stability for knowledge that predates the record
+OLD = 30.0  # days of stability for knowledge that predates the record, when the answer is clean
 PRIOR = 10  # picks' worth of trust in a confidence digit before the record says otherwise
 
 
@@ -78,7 +79,7 @@ def recall(answers: list[Answer], now: dt.datetime,
     one."""
     answers = sorted((a for a in answers if a.flag != "pre"), key=lambda a: a.at)  # stable: file order at equal times
     last = answers[-1] if answers else None
-    counted = [(_days(a.at), q, a.taught) for a in answers
+    counted = [(_days(a.at), q, a.probe) for a in answers
                if (q := quality(a, calib or {})) is not None]
     if not counted:
         return Recall(None, None, len(answers), last)
@@ -97,11 +98,11 @@ def _retrievability(s: float, t: float) -> float:
 
 
 def _replay(counted: list[tuple[float, float, bool]]) -> tuple[float, float]:
-    """(time in days, quality, taught) in order → (stability, time of the last answer)."""
-    (t, q, taught), rest = counted[0], counted[1:]
+    """(time in days, quality, probe) in order → (stability, time of the last answer)."""
+    (t, q, probe), rest = counted[0], counted[1:]
     s, d, last = _initial_stability(q), _clamp(_initial_difficulty(q)), t
-    if q >= HARD and not taught:
-        s = max(s, OLD)
+    if q >= HARD and probe:  # held before the record began: start toward OLD, by how sure
+        s = math.exp((GOOD - q) * math.log(s) + (q - HARD) * math.log(OLD))
     for t, q, _ in rest:
         s, d, last = _next_stability(s, d, q, t - last), _next_difficulty(d, q), t
     return s, last

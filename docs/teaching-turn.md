@@ -87,8 +87,9 @@ Built with the turn, on 2026-11-10:
 - An answer records what happened (right, partly, wrong, never met; the
   confidence digit; the help a step took) in place of the grades again, hard,
   good and easy. The memory model reads confidence against the learner's own
-  record, and starts a right first answer to an untaught idea at thirty days
-  of stability.
+  record. A question tagged `probe` is asked to find out what they already
+  held; a right first answer to one starts at up to thirty days of stability,
+  by how sure it was.
 
 Still to build:
 
