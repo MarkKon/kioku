@@ -1,6 +1,9 @@
 # v1 skills: kioku, learn, pair
 
-Proposal, 2026-11-09, revised after the first read. The knowledge model is
+Proposal, 2026-11-09, revised after the first read. Built the same day, and
+kept as the record of the reasoning. What is current is in `skills/`; the
+`learn` and `pair` sections below were replaced on 2026-11-10 by the teaching
+turn (`skills/kioku/turn.md`, reasons in `docs/teaching-turn.md`). The knowledge model is
 settled (`PHILOSOPHY.md`, "The model, and why"). This is the shape of the
 three skills built on it, the evidence behind each rule, and how the repo
 becomes usable by anyone.
@@ -11,8 +14,8 @@ _sessions_).
 
 ## The name: `kioku`
 
-`kioku` was named for the essay and paper skills, whose audience is a
-kioku. The tool is no longer about a learner: it is a memory model of the
+`reader` was named for the essay and paper skills, whose audience is a
+reader. The tool is no longer about a reader: it is a memory model of the
 person an agent works with, a backend any skill can ask "do they hold this?".
 It becomes **`kioku`** (記憶, memory: the faculty and the store), a sibling of
 Anki (暗記, rote memorisation) that models what is held rather than drilling
@@ -53,7 +56,7 @@ These come from what went wrong in past sessions, and hold in every skill:
 
 ## `kioku`: small, loaded by every session
 
-Renamed from `kioku`. Its job: let any agent, in any
+Renamed from `reader-brief`. Its job: let any agent, in any
 task, find out whether the learner holds what the next step leans on, and ask
 when it is not settled. It is read by almost every session, so the main file
 stays under about 700 words; what is needed only sometimes is one link away.

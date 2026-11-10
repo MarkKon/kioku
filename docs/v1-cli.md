@@ -1,6 +1,7 @@
 # kioku v1: files and commands
 
-A spec to agree on before code. The model itself (ideas, areas, edges, depth)
+A spec agreed on 2026-11-08 and built, kept as the record of the reasoning.
+What is current is in `kioku -h` and the README. The model itself (ideas, areas, edges, depth)
 is in `PHILOSOPHY.md` ("The model, and why") and `GLOSSARY.md`; this page is
 only how it is stored and how agents reach it.
 

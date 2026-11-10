@@ -1,6 +1,6 @@
 """Question blocks: the one way to ask, and the only source of evidence.
 
-A block is written in a small text format (see the learner-brief skill), stored
+A block is written in a small text format (`kioku ask -h`), stored
 as a dict (JSON in the store), shown as markdown, and answered in one line.
 Grading a reply turns each answered item into an Answer. Nothing here touches
 files.
