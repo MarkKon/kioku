@@ -26,9 +26,10 @@ re-derivation.
 - **Evidence** is an answer to a question asked here, or a pairing step they
   typed and a test verified. Nothing else moves a number: what they said in
   passing, what you taught, what they say they know, what their notes say.
-- **R** is the probability they recall an idea now, from that idea's own
-  evidence. No answers means no R: unknown, not absent. A wrong last answer
-  holds R at 0 until a right one.
+- **R** is the probability they can recall and use an idea now, with their
+  notebook open when they keep one, from that idea's own evidence. No answers
+  means no R: unknown, not absent. A wrong last answer holds R at 0 until a
+  right one. An idea they said they have never met reads `unmet`.
 - Each answer records the **depth** its item demanded: state, use (the
   default) or transfer.
 
@@ -100,7 +101,11 @@ call, graded by the help it took: `kioku observed name=good|hard|again …
 
 Look up before adding, and reuse what exists. Add an idea when the task leans
 on one that has no entry, not in advance: `kioku add` (format: `kioku add
--h`). Before adding, editing or removing, read [ideas.md](ideas.md): what one
+-h`), or its block written above the question block that asks about it. Before adding, editing or removing, read [ideas.md](ideas.md): what one
 idea is, which edges to write, and where it lives.
+
+`kioku log` lists what was asked and answered in the last hours, block by
+block, with the items still open: read it when a session resumes or your
+context was cut.
 
 Daily checks and backup: [upkeep.md](upkeep.md).

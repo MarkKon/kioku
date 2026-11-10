@@ -18,10 +18,22 @@ from .records import DEPTHS, Answer
 from .text import short
 
 # `1 pick banach-fixed-point use: …`: the item's idea (name, alias or id), optionally
-# the depth it demands (default use), and optionally `pre`: asked before the idea is
-# taught, so its answer is kept as data but is not evidence of memory
+# the depth it demands (default use), and optionally `pre` (asked before the idea is
+# taught, so its answer is kept as data but is not evidence of memory) or `taught` (the
+# session explained the idea before this question; recorded with the answer)
 ITEM_RE = re.compile(r"^(\d+)\s+(pick|write|say)\s+([^\s:]+)(?:\s+(" + "|".join(DEPTHS)
-                     + r"))?(?:\s+(pre))?:\s*(.*)$")
+                     + r"))?(?:\s+(pre|taught))?:\s*(.*)$")
+
+
+def split_ideas(text: str) -> tuple[str, str]:
+    """Idea blocks (`## name · kind · area`, as for `kioku add`) written above a question
+    block → (the idea blocks, the question block)."""
+    lines = text.splitlines()
+    if not any(l.startswith("## ") for l in lines):
+        return "", text
+    cut = next((k for k, l in enumerate(lines) if l.startswith("# ") or ITEM_RE.match(l)),
+               len(lines))
+    return "\n".join(lines[:cut]), "\n".join(lines[cut:])
 REPLY_RE = re.compile(r"(?:(?<=[\s,;])|^)(\d{1,2})([a-h][0-9]?|[.=~x?\-])(?=[\s,;:]|$)")
 
 
@@ -40,7 +52,8 @@ def parse_block(text: str) -> tuple[str, list[dict], list[str]]:
         m = ITEM_RE.match(line)
         if m:
             items.append({"n": int(m[1]), "kind": m[2], "id": m[3], "depth": m[4] or "use",
-                          "pre": bool(m[5]), "q": m[6], "options": [], "why": "", "ref": ""})
+                          "pre": m[5] == "pre", "taught": m[5] == "taught", "q": m[6],
+                          "options": [], "why": "", "ref": ""})
             continue
         if not items:
             problems.append(f"before the first item: {line}")
@@ -130,7 +143,7 @@ def grade_say(ask: dict, n: int, grade: str, now: dt.datetime, mis: str | None =
         or "graded by the agent"
     flag = "pre" if it.get("pre") else "mis" if mis else None
     return Answer(now, it["id"], it["kind"], grade, ask["id"], n,
-                  flag=flag, depth=it.get("depth"), note=text)
+                  flag=flag, depth=it.get("depth"), note=text, taught=bool(it.get("taught")))
 
 
 def parse_reply(reply: str, n_items: int) -> list[tuple[int, str, str]]:
@@ -165,7 +178,7 @@ def _grade_item(qid: str, it: dict, tok: str, thoughts: str,
         if it.get("pre"):  # before teaching: kept as data, skipped by the memory model
             flag = "pre"
         return Answer(now, it["id"], kind, grade, qid, n, conf, flag, it.get("depth"),
-                      note + said)
+                      note + said, bool(it.get("taught")))
 
     if tok == "-":
         return "never met", answer("again", "never met it", flag="unseen"), True

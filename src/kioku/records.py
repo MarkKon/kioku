@@ -48,6 +48,7 @@ class Answer:
     flag: str | None = None  # mis: a misconception; unseen: never met it; pre: before teaching
     depth: str | None = None  # what the question demanded: state, use, transfer
     note: str = ""
+    taught: bool = False  # the session explained the idea before this question
 
     @property
     def day(self) -> dt.date:

@@ -26,6 +26,7 @@ from typing import NoReturn
 
 from . import config, questions, upkeep, view
 from .model import Model
+from .notebook import Notebook
 from .records import GRADES, IDEA_KINDS, Answer, Idea
 from .store import AREA, NAME, QID, SEP, Snapshot, Store, block_idea, check_block, \
     format_answer, new_id, parse_blocks
@@ -40,6 +41,7 @@ class Context:
         self.cfg = config.load()
         self.store = Store(self.cfg.home)
         self.vault = Vault(self.cfg.vault, self.cfg.cache) if self.cfg.vault else None
+        self.notebook = Notebook(self.cfg.notebook) if self.cfg.notebook else None
         self._model: Model | None = None
 
     @property
@@ -71,7 +73,7 @@ def stdin_text(required: bool) -> str:
 
 # -- output
 
-LEGEND = "R = recall now, – = never asked"
+LEGEND = "R = recall now, – = never asked, unmet = never met"
 
 
 def fmt_r(r: float | None) -> str:
@@ -95,20 +97,26 @@ def row(m: Model, iid: str, label: str | None = None, width: int = 30) -> str:
     """name, kind, R, answers, last answer and its grade, deepest depth shown. With a
     label (`needs`, `used by`; '' continues the one above) the row is indented under it."""
     i, rc = m.ideas[iid], m.recall(iid)
-    last = f"{when(m, rc.last.at)} {rc.last.grade}" if rc.last else ""
+    last = "" if not rc.last else when(m, rc.last.at) if m.unmet(iid) \
+        else f"{when(m, rc.last.at)} {rc.last.grade}"
     flags = []
     if rc.last and rc.last.flag == "mis":
         flags.append(f"! misconception: {short(rc.last.note.removeprefix('misconception: '), 70)}")
-    elif rc.last and rc.last.flag == "unseen":
-        flags.append("never met it")
     head = f"  {label:<11}" if label is not None else "  "
-    return (f"{head}{i.name:<{width + 1}}{i.kind:<11}R {fmt_r(rc.r):>3}  "
+    return (f"{head}{i.name:<{width + 1}}{i.kind:<11}{r_cell(m, iid)}  "
             f"n{rc.n:<3}{last:<12} {m.deepest(iid) or '':<9}" + "  ".join(flags)).rstrip()
+
+
+def r_cell(m: Model, iid: str) -> str:
+    """R in five characters; an idea last answered "never met" says so instead."""
+    return "unmet" if m.unmet(iid) else f"R {fmt_r(m.recall(iid).r):>3}"
 
 
 def coverage_line(m: Model, ids: list[str]) -> str:
     c = m.coverage(ids)
-    return f"{c.ideas} idea{'' if c.ideas == 1 else 's'} · {c.asked} asked · last {when(m, c.last)}"
+    unmet = f" · {c.unmet} unmet" if c.unmet else ""
+    return (f"{c.ideas} idea{'' if c.ideas == 1 else 's'} · {c.asked} asked{unmet} · "
+            f"last {when(m, c.last)}")
 
 
 def warn(m: Model):
@@ -161,6 +169,8 @@ def cmd_profile(ctx: Context, a):
     if text is None:
         die(f"no profile yet; `kioku init`, then describe the learner in {ctx.cfg.home}/profile.md")
     print(text.strip())
+    if ctx.cfg.notebook:
+        print(f"\nNotebook: {ctx.cfg.notebook} (notes the agent writes: `kioku note <idea>`)")
 
 
 def cmd_context(ctx: Context, a):
@@ -171,7 +181,7 @@ def cmd_context(ctx: Context, a):
     for t in terms:
         print()
         if (iid := m.resolve(t)) is not None:
-            show_idea(ctx, iid, a.answers)
+            show_near(m, iid) if a.near else show_idea(ctx, iid, a.answers)
         elif (area := m.area_of(t)) is not None:
             show_area(m, area)
         else:
@@ -205,13 +215,18 @@ def show_area(m: Model, area: str):
 def show_idea(ctx: Context, iid: str, answers: bool):
     m = ctx.model
     i, rc = m.ideas[iid], m.recall(iid)
-    last = f" · last {when(m, rc.last.at)} {rc.last.grade}" if rc.last else ""
+    unmet = m.unmet(iid)
+    last = "" if not rc.last else f" · last {when(m, rc.last.at)}" \
+        + ("" if unmet else f" {rc.last.grade}")
     depth = f" ({m.deepest(iid)})" if m.deepest(iid) else ""
-    print(f"{i.name}{SEP}{i.kind}{SEP}{i.area}{SEP}R {fmt_r(rc.r)} n{rc.n}{last}{depth}")
+    r = "unmet" if unmet else f"R {fmt_r(rc.r)}"
+    print(f"{i.name}{SEP}{i.kind}{SEP}{i.area}{SEP}{r} n{rc.n}{last}{depth}")
     print(f"  {i.statement}")
     extra = [f"aliases: {', '.join(i.aliases)}"] if i.aliases else []
     if i.vault:
         extra.append(f"vault: {i.vault}")
+    if ctx.notebook and ctx.notebook.has(i):
+        extra.append(f"note: {ctx.notebook.path(i)}")
     if extra:
         print("  " + " · ".join(extra))
     groups = (("needs", m.needs), ("uses", m.uses), ("needed by", m.needed_by),
@@ -234,6 +249,23 @@ def show_idea(ctx: Context, iid: str, answers: bool):
                 print(f"      asked: {short(ask['items'][ans.n - 1]['q'], 110)}")
         if rc.r is not None:
             print(f"  R now {rc.r:.3f}, stability {rc.stability:.1f} days")
+
+
+def show_near(m: Model, iid: str, limit: int = 20):
+    """The ideas close to one: asked ones by rising R, then never asked, then never met."""
+    i = m.ideas[iid]
+
+    def order(x: tuple[str, str]):
+        r = m.recall(x[1]).r
+        return (2 if m.unmet(x[1]) else 1 if r is None else 0, r or 0)
+
+    near = sorted(m.near(iid), key=order)
+    print(f"near {i.name}{SEP}{i.area}{SEP}{len(near)} idea(s), lowest R first")
+    w = width_for(m, [j for _, j in near[:limit]])
+    for where, j in near[:limit]:
+        print(row(m, j, where, w))
+    if len(near) > limit:
+        print(f"  … and {len(near) - limit} more")
 
 
 def show_search(ctx: Context, term: str):
@@ -324,12 +356,12 @@ def check_cycles(m: Model, changed: list[Idea]) -> list[str]:
     return [" → ".join(trial.name(x) for x in c) for c in trial.cycles() if c[0] in touched]
 
 
-def cmd_add(ctx: Context, a):
+def plan_add(ctx: Context, text: str, anyway: bool,
+             new_area: bool) -> tuple[list[Idea], list[str], list[str]]:
+    """Idea blocks → (the ideas to add, the areas to make, what is wrong). Writes nothing."""
     m = ctx.model
     problems: list[str] = []
-    blocks = parse_blocks(stdin_text(required=True), "stdin", problems, need_id=False)
-    if not blocks and not problems:
-        die("no ideas read; want `## name · kind · area`, the statement, then `- needs: …`")
+    blocks = parse_blocks(text, "stdin", problems, need_id=False)
     batch = {b["name"]: b for b in blocks}
     taken = set(m.ideas)
     new: list[Idea] = []
@@ -341,7 +373,7 @@ def cmd_add(ctx: Context, a):
         if not re.fullmatch(AREA, area):
             problems.append(f"{where} `{area}` is not an area path (e.g. maths/analysis)")
         elif area not in m.areas and area not in new_areas:
-            if a.new_area:
+            if new_area:
                 new_areas.append(area)
             else:
                 near = [x for x in sorted(m.areas) if x.rsplit("/", 1)[-1] in area or area in x]
@@ -351,7 +383,7 @@ def cmd_add(ctx: Context, a):
             j = m.by_name.get(b["name"])
             problems.append(f"{where} the name is taken" + (f" by {j}: {short(m.ideas[j].statement, 80)}"
                                                            if j else " twice in this input"))
-        elif not a.anyway:
+        elif not anyway:
             for r, j in m.similar(b["name"], b["statement"])[:3]:
                 problems.append(f"{where} close to {m.ideas[j].name} ({r:.2f}): "
                                 f"{short(m.ideas[j].statement, 80)} (--anyway adds it regardless)")
@@ -371,11 +403,22 @@ def cmd_add(ctx: Context, a):
         new.append(replace(block_idea(b, iid, area), needs=tuple(needs), uses=tuple(uses)))
     if not problems:
         problems += [f"cycle: {c}" for c in check_cycles(m, new)]
-    if problems:
-        die("nothing added:\n  " + "\n  ".join(problems))
+    return new, new_areas, problems
+
+
+def write_added(ctx: Context, new: list[Idea], new_areas: list[str]) -> None:
     for area in new_areas:
         ctx.store.make_area(area)
-    ctx.store.write_ideas(new, m.ideas)
+    ctx.store.write_ideas(new, ctx.model.ideas)
+
+
+def cmd_add(ctx: Context, a):
+    new, new_areas, problems = plan_add(ctx, stdin_text(required=True), a.anyway, a.new_area)
+    if not new and not problems:
+        die("no ideas read; want `## name · kind · area`, the statement, then `- needs: …`")
+    if problems:
+        die("nothing added:\n  " + "\n  ".join(problems))
+    write_added(ctx, new, new_areas)
     after = Model(ctx.store.load(), ctx.cfg.now)
     for i in new:
         print(f"{i.id} {i.name} → {i.area} (now {len(after.in_area(i.area))} ideas)")
@@ -500,17 +543,29 @@ def cmd_rm(ctx: Context, a):
 def cmd_ask(ctx: Context, a):
     m = ctx.model
     text = open(a.file).read() if a.file else stdin_text(required=True)
-    title, items, problems = questions.parse_block(text)
+    ideas_text, text = questions.split_ideas(text)
+    new, new_areas, problems = plan_add(ctx, ideas_text, a.anyway, a.new_area) \
+        if ideas_text.strip() else ([], [], [])
+    added = {i.name: i for i in new}
+    title, items, block_problems = questions.parse_block(text)
+    problems += block_problems
     if not items:
         problems.append("no items")
     for it in items:
         j = m.resolve(it["id"])
-        if j is None:
-            problems.append(f"item {it['n']}: unknown idea {it['id']} (add it with `kioku add`)")
+        if it["id"] in added:
+            it["id"], it["name"] = added[it["id"]].id, it["id"]
+        elif j is None:
+            problems.append(f"item {it['n']}: unknown idea {it['id']} (put its `## name · kind "
+                            f"· area` block above the title, or add it with `kioku add`)")
         else:
             it["id"], it["name"] = j, m.ideas[j].name
     if problems:
-        die("question block not stored:\n  " + "\n  ".join(problems))
+        die("question block not stored" + (", no idea added" if ideas_text.strip() else "")
+            + ":\n  " + "\n  ".join(problems))
+    if new:
+        write_added(ctx, new, new_areas)
+        print("kioku: added " + ", ".join(f"{i.name} ({i.id})" for i in new))
     ask = questions.new_block(new_id("q_", ctx.store.ask_ids()), title, items, ctx.cfg.now)
     ctx.store.save_ask(ask)
     rule = "─" * 60
@@ -655,6 +710,60 @@ def cmd_unmet(ctx: Context, a):
           + ", ".join(m.name(j) for j in ids))
 
 
+def span(text: str) -> dt.timedelta:
+    m = re.fullmatch(r"(\d+)\s*([mhd])", text.strip())
+    if not m:
+        die(f"`{text}`: want a span such as 90m, 3h or 2d")
+    return dt.timedelta(**{{"m": "minutes", "h": "hours", "d": "days"}[m[2]]: int(m[1])})
+
+
+def cmd_log(ctx: Context, a):
+    m = ctx.model
+    since = ctx.cfg.now - span(a.since)
+    asks = [x for q in ctx.store.ask_ids()
+            if (x := ctx.store.ask(q)) and dt.datetime.fromisoformat(x["asked"]) >= since]
+    asks.sort(key=lambda x: x["asked"])
+    by = {(x.ask, x.n): x for x in m.answers}
+    print(f"kioku log · since {since:%Y-%m-%d %H:%M} · {len(asks)} block(s)")
+    waiting = 0
+    for ask in asks:
+        print(f"\n{ask['id']}{SEP}{when(m, dt.datetime.fromisoformat(ask['asked']))}{SEP}"
+              f"{ask['title'] or 'Questions'}")
+        w = max(len(m.name(it["id"])) for it in ask["items"])
+        for it in ask["items"]:
+            ans = by.get((ask["id"], it["n"]))
+            if ans is None:
+                what = {"to-grade": "answered, not graded yet", "done": "answer set aside",
+                        "shown": "reference shown, not graded yet"}.get(it.get("state"), "open")
+                waiting += it.get("state") != "done"
+            elif ans.flag == "unseen":
+                what = "never met"
+            else:
+                what = " ".join(x for x in (
+                    ans.grade, "" if ans.conf is None else str(ans.conf), ans.flag or "",
+                    ans.depth or "", "taught" if ans.taught else "") if x)
+                what += f" — {short(ans.note, 70)}" if ans.note else ""
+            print(f"  {it['n']:>2} {m.name(it['id']):<{w}}  {it['kind']:<8} {what}")
+    if waiting:
+        print(f"\n{waiting} item(s) without a recorded answer")
+
+
+def cmd_note(ctx: Context, a):
+    if ctx.notebook is None:
+        die("no notebook; set `notebook = \"<folder>\"` in config.toml in the model folder "
+            "(or KIOKU_NOTEBOOK)")
+    m = ctx.model
+    for t in terms_of(a.ideas):
+        j = m.resolve(t)
+        if j is None:
+            die(f"no idea `{t}` (add it with `kioku add`)")
+        path, made = ctx.notebook.ensure(m, m.ideas[j])
+        print(f"{path}" + ("  (new: write below the marked line)" if made else ""))
+    n = ctx.notebook.write_indexes(m)
+    if not a.ideas:
+        print(f"{n} area index note(s) written in {ctx.notebook.notes}")
+
+
 # -- commands: upkeep
 
 def cmd_upkeep(ctx: Context, a):
@@ -677,7 +786,7 @@ ASK_FORMAT = """\
 A block, on stdin or in a file:
 
   # <title>
-  <n> pick|write|say <idea> [state|use|transfer] [pre]: <question>
+  <n> pick|write|say <idea> [state|use|transfer] [pre|taught]: <question>
     * <the right option>                         pick: exactly one
     - <a wrong option> :: <the misconception a confident pick of it shows>
     ? <explanation, shown with the verdict>
@@ -686,7 +795,13 @@ A block, on stdin or in a file:
 <idea> is a name, alias or id. The depth is what the item demands: state (recall
 it), use (apply it when named, the default), transfer (reach for it where nothing
 points to it). pre: asked before the idea is taught; the answer is kept but is
-not evidence of memory.
+not evidence of memory. taught: the session explained the idea before this
+question (a worked example, a correction); the answer counts and is marked, so
+what was learned today can be told from what was held before.
+
+Ideas the block asks about that have no entry yet can be added in the same
+call: put their blocks (`## name · kind · area`, see `kioku add -h`) above the
+title. Nothing is added unless the block is stored.
 
 Replies, all items on one line, e.g. `1b8 2. 3: the variance shrinks`:
   pick   a letter and a confidence digit: `1b8` (option b, 80% sure)
@@ -759,6 +874,21 @@ Each idea must exist (`kioku add`) and have no answers yet.
 """
 
 
+NOTE_FORMAT = """\
+The notebook is a folder of notes the agent writes for the learner to look
+things up in: `notebook = "<folder>"` in config.toml. One note per idea, named
+by its id, in the format of a vault (frontmatter, `[[id|label]]` links).
+
+  kioku note girsanov        prints the note's path, making its skeleton if new:
+                             the statement and links along the idea's edges
+  kioku note                 rewrites the index note of every area with notes
+
+Write the body with your file tools, below the marked line: the formula or
+signature, one example, a figure where it helps. Keep it terse. Notes are
+never evidence.
+"""
+
+
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="kioku", description=(__doc__ or "").split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -779,6 +909,9 @@ def parser() -> argparse.ArgumentParser:
              "no argument: the top of the area tree")
     sp.add_argument("what", nargs="*")
     sp.add_argument("--answers", action="store_true", help="every answer, with its question")
+    sp.add_argument("--near", action="store_true",
+                    help="for an idea: the ideas within two edges and in the areas around "
+                         "it, lowest R first")
     sp = add("graph", cmd_graph, "draw the model (or the neighbourhood of some ideas or an area) "
              "as an interactive graph in the browser")
     sp.add_argument("what", nargs="*")
@@ -807,6 +940,10 @@ def parser() -> argparse.ArgumentParser:
     sp = add("ask", cmd_ask, "store a question block (file or stdin), print it shuffled with its id",
              ASK_FORMAT)
     sp.add_argument("file", nargs="?")
+    sp.add_argument("--anyway", action="store_true",
+                    help="add an idea written above the block despite a likely duplicate")
+    sp.add_argument("--new-area", action="store_true",
+                    help="make the area of an idea written above the block")
     sp = add("answer", cmd_answer, "grade the learner's one-line reply to a block and record it "
              "now; also grade say items, regrade, retract", ANSWER_FORMAT)
     sp.add_argument("ask", help="the block id, q_…")
@@ -832,6 +969,12 @@ def parser() -> argparse.ArgumentParser:
              "triage", UNMET_FORMAT)
     sp.add_argument("ideas", nargs="+", metavar="NAME")
     sp.add_argument("--note", help="what the triage was for")
+
+    sp = add("log", cmd_log, "what was asked and answered lately, block by block")
+    sp.add_argument("--since", default="3h", help="how far back: 90m, 3h, 2d (default 3h)")
+    sp = add("note", cmd_note, "the notebook note of an idea (made if new); no argument: "
+             "rewrite the area indexes", NOTE_FORMAT)
+    sp.add_argument("ideas", nargs="*")
 
     sp = add("upkeep", cmd_upkeep, "daily: check, back up, duplicates, areas to split, "
              "calibration, vault notes without ideas")

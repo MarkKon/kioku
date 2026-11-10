@@ -48,6 +48,8 @@ subject's area. Areas are for finding and coverage, never prerequisites.
 ## Adding
 
 Pipe blocks into `kioku add <<'EOF' … EOF`, so no shell sees the statement.
+An idea a question is about can go in with it: the same block, above the
+title of the question block piped into `kioku ask`.
 Several blocks may go in at once; an edge may name an idea added earlier in
 the same input. It prints each new id and the area's size, and refuses (with
 what it found) a duplicate, an edge to an unknown idea, an unknown area, or a

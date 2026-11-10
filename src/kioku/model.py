@@ -19,6 +19,7 @@ class Coverage:
     ideas: int
     asked: int  # ideas with at least one answer
     last: dt.datetime | None  # the latest answer in the area
+    unmet: int = 0  # ideas whose latest answer is "never met"
 
 
 class Model:
@@ -110,7 +111,39 @@ class Model:
     def coverage(self, ids: list[str]) -> Coverage:
         asked = [i for i in ids if any(a.flag != "pre" for a in self.answers_for(i))]
         last = max((a.at for i in asked for a in self.answers_for(i)), default=None)
-        return Coverage(len(ids), len(asked), last)
+        return Coverage(len(ids), len(asked), last, sum(self.unmet(i) for i in asked))
+
+    def unmet(self, iid: str) -> bool:
+        """The latest answer says they have never met the idea."""
+        last = self.recall(iid).last
+        return bool(last and last.flag == "unseen")
+
+    def near(self, iid: str, steps: int = 2) -> list[tuple[str, str]]:
+        """Ideas close to this one, as (where, id): within `steps` edges in either
+        direction, then the rest of its area, then the areas beside it."""
+        out: dict[str, str] = {}
+        frontier, seen = [iid], {iid}
+        for d in range(1, steps + 1):
+            nxt = []
+            for i in frontier:
+                for j in (*self.needs.get(i, ()), *self.uses.get(i, ()),
+                          *self.needed_by.get(i, ()), *self.used_by.get(i, ())):
+                    if j not in seen:
+                        seen.add(j)
+                        nxt.append(j)
+                        out[j] = f"{d} edge{'' if d == 1 else 's'}"
+            frontier = nxt
+        area = self.ideas[iid].area
+        parent = area.rsplit("/", 1)[0] if "/" in area else ""
+        for j in self.in_area(area):
+            if j not in seen:
+                seen.add(j)
+                out[j] = "same area"
+        for j in (self.in_area(parent, deep=True) if parent else []):
+            if j not in seen:
+                seen.add(j)
+                out[j] = "near area"
+        return [(where, j) for j, where in out.items()]
 
     # -- search
 

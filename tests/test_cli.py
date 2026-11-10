@@ -180,7 +180,7 @@ def test_an_answer_before_teaching_is_kept_but_not_evidence(kioku):
 
 
 def test_the_formats_are_in_the_help(kioku):
-    assert "pick|write|say <idea> [state|use|transfer] [pre]" in kioku("ask", "-h").stdout
+    assert "pick|write|say <idea> [state|use|transfer] [pre|taught]" in kioku("ask", "-h").stdout
     assert "## <name> · <kind> · <area>" in kioku("add", "-h").stdout
     assert "good   done clean" in kioku("observed", "-h").stdout
 
@@ -202,7 +202,8 @@ def test_triage_records_the_names_never_met(kioku):
     lines = evidence(kioku)
     assert [l.split()[2:6] for l in lines] == [["p_aaaa", "triage", "again", "unseen"],
                                               ["p_bbbb", "triage", "again", "unseen"]]
-    assert "never met it" in kioku("context", "increments").stdout
+    out = kioku("context", "increments").stdout
+    assert "· unmet n1 · last" in out and "2 asked · 2 unmet" in out
     kioku("upkeep", "--check")
     r = kioku("unmet", "increments", ok=False)  # it has an answer now: ask, don't triage
     assert r.returncode == 1 and "already has answers" in r.stderr
@@ -386,3 +387,59 @@ def test_migration_from_v0(tmp_path):
     r = subprocess.run([sys.executable, "-m", "kioku", "upkeep", "--check"],
                        capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+# -- the teaching turn's commands
+
+def test_ask_adds_the_ideas_written_above_the_block(kioku):
+    block = ("## ito-isometry · result · maths/probability/stochastic-calculus\n"
+             "E[(∫H dW)²] = E[∫H² dt]\n- needs: quadratic-variation\n\n"
+             "# isometry\n1 say ito-isometry taught: state it\n  = the identity\n")
+    out = kioku("ask", stdin=block).stdout
+    assert "kioku: added ito-isometry (i_" in out and "stored as q_" in out
+    assert "ito-isometry" in kioku.area.read_text()
+    qid = next(t for t in out.split("`") if t.startswith("kioku answer q_")).split()[2]
+    kioku("answer", qid, "1: the identity", "--say", "1=good")
+    assert " say good use taught q_" in evidence(kioku)[0]
+    kioku("upkeep", "--check")
+    # a broken block adds nothing
+    bad = block.replace("ito-isometry", "ito-two").replace("  = the identity\n", "")
+    r = kioku("ask", stdin=bad, ok=False)
+    assert "no idea added" in r.stderr and "ito-two" not in kioku.area.read_text()
+
+
+def test_log_shows_the_blocks_asked_lately(kioku):
+    qid, out = ask(kioku)
+    right = "a" if "**a)** independent" in out else "b"
+    kioku("answer", qid, f"1{right}9")
+    kioku("unmet", "QV")
+    out = kioku("log", "--since", "1h").stdout
+    assert "2 block(s)" in out and qid in out
+    assert "good 9 use" in line_of(out, "increments")
+    assert "2 item(s) without a recorded answer" in out and "never met" in out
+    assert "0 block(s)" in kioku("log", at="2026-11-09").stdout
+    assert "want a span" in kioku("log", "--since", "soon", ok=False).stderr
+
+
+def test_near_lists_the_ideas_around_one(kioku):
+    out = kioku("context", "increments", "--near").stdout
+    assert "near increments" in out and "2 idea(s)" in out
+    assert "  1 edge     quadratic-variation " in out
+
+
+def test_the_notebook_gets_a_note_and_its_indexes(kioku, tmp_path):
+    assert "no notebook" in kioku("note", "QV", ok=False).stderr
+    (kioku.home / "config.toml").write_text(f'notebook = "{tmp_path / "nb"}"\n')
+    out = kioku("note", "QV").stdout
+    note = tmp_path / "nb" / "notes" / "p_bbbb.md"
+    assert str(note) in out and "new" in out
+    text = note.read_text()
+    assert 'aliases: ["quadratic-variation"]' in text and "the QV of BM on [0,t] is t" in text
+    assert "Needs: [[p_aaaa|increments]]" in text
+    index = tmp_path / "nb" / "notes" / "area--maths--probability--stochastic-calculus.md"
+    assert "[[p_bbbb|quadratic-variation]] (result)" in index.read_text()
+    assert "[[area--maths|maths]]" in (tmp_path / "nb" / "notes" / "index.md").read_text()
+    note.write_text(text + "\n$[W]_t = t$\n")  # the agent's body survives a second call
+    assert "new" not in kioku("note", "QV").stdout and "$[W]_t = t$" in note.read_text()
+    assert f"note: {note}" in kioku("context", "QV").stdout
+    assert "Notebook:" in kioku("profile", ok=False).stdout + kioku("init").stdout + kioku("profile").stdout

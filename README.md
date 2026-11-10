@@ -59,7 +59,9 @@ Ideas are added with `kioku add` (blocks on stdin), changed or moved with
 `archive.md` rather than dropping them. An answer that should not count is set
 aside the same way with `kioku answer --retract`. A step of pairing work that
 a test verified is recorded with `kioku observed`, and the names the learner
-marks as never met in a triage with `kioku unmet`.
+marks as never met in a triage with `kioku unmet`. `kioku log` lists what was
+asked and answered in the last hours, and `kioku context <idea> --near` the
+ideas around one, lowest R first.
 
 Evidence comes only from questions asked and answered and from verified work,
 never from conversation or self-report. A memory model (FSRS-6 for now, on
@@ -100,9 +102,13 @@ Settings come from the environment, or from `config.toml` in the model folder:
 | ------------------- | ------------- | --------------------------------------------- |
 | `KIOKU_HOME`        |               | the model folder (default `~/.local/share/kioku`) |
 | `KIOKU_VAULT`       | `vault`       | a folder of your markdown notes, shown as hints |
+| `KIOKU_NOTEBOOK`    | `notebook`    | a folder the agent writes notes into, for you to look things up in |
 | `KIOKU_SCOUT_MODEL` | `scout_model` | a [pi](https://github.com/badlogic/pi-mono) model that drafts ideas from notes |
 
-Both the notes folder and the scout are optional. Run `kioku upkeep` daily to
+The notes folder, the notebook and the scout are optional. The notebook holds
+one note per idea the agent has taught you (`kioku note <idea>`), with an
+index note per area; it uses the same format as a notes folder, so the same
+editor reads both, and you may keep it open while you answer. Run `kioku upkeep` daily to
 check and back up the model (it commits to the model folder's git repo, and
 pushes when it has a remote) and to list duplicates and areas worth splitting.
 
@@ -116,6 +122,7 @@ pushes when it has a remote) and to list duplicates and areas worth splitting.
 | `model.py`     | the model in memory: names, edges, areas and coverage, search, recall per idea |
 | `questions.py` | question blocks: parse, render, grade replies             |
 | `vault.py`     | the optional notes folder, read only                      |
+| `notebook.py`  | the optional notebook: note skeletons and area indexes    |
 | `upkeep.py`    | checks, duplicates, areas to split, calibration, backup, drafting |
 | `view.py`      | the graph page (`kioku graph`) and its local server; template and vendored [force-graph](https://github.com/vasturiano/force-graph) (MIT) in `assets/` |
 | `cli.py`       | arguments and printing                                    |

@@ -5,6 +5,7 @@ model folder:
 
   KIOKU_HOME          the model folder (default ~/.local/share/kioku)
   KIOKU_VAULT         vault = "…"        a folder of markdown notes (optional)
+  KIOKU_NOTEBOOK      notebook = "…"     a folder the agent writes notes into (optional)
   KIOKU_SCOUT_MODEL   scout_model = "…"  a pi model for drafting (optional)
   KIOKU_TODAY         fixes the clock, for tests: a date (read as noon) or a
                        date and time, e.g. 2026-11-02T09:30
@@ -23,6 +24,7 @@ from pathlib import Path
 class Config:
     home: Path
     vault: Path | None
+    notebook: Path | None
     scout_model: str | None
     now: dt.datetime
     cache: Path
@@ -39,11 +41,13 @@ def load() -> Config:
     except FileNotFoundError:
         file = {}
     vault = os.environ.get("KIOKU_VAULT") or file.get("vault")
+    notebook = os.environ.get("KIOKU_NOTEBOOK") or file.get("notebook")
     fixed = os.environ.get("KIOKU_TODAY")
     cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "kioku"
     return Config(
         home=home,
         vault=Path(vault).expanduser() if vault else None,
+        notebook=Path(notebook).expanduser() if notebook else None,
         scout_model=os.environ.get("KIOKU_SCOUT_MODEL") or file.get("scout_model"),
         now=_moment(fixed) if fixed else dt.datetime.now().replace(microsecond=0),
         cache=cache,

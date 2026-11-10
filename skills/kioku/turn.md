@@ -13,6 +13,8 @@ one. Only **repair** spends a second turn on a step.
 1. **Asked before used.** Everything the turn builds on has an answer in the
    model. Name it in one line: `Builds on: conditional probability (R .9)`.
    What has no answer is asked in this turn and given in full, as if not held.
+   An idea with no entry goes in with its question: write its block above the
+   question block (`kioku ask -h`).
 2. **One new idea** per turn.
 3. **The learner acts last.** The turn ends with something for them to answer,
    write or type. Only the closing turn of a session ends otherwise.
@@ -40,7 +42,8 @@ Open with what their last reply showed.
   it fails, give the right idea. Then ask it again with a fresh case. A repair
   introduces nothing new and asks about nothing else.
 - When they worked an idea out from a case, state it here in general and give
-  it its name. From then on the name can be used.
+  it its name. From then on the name can be used, and its note goes into the
+  notebook (below).
 
 ### Anchor
 
@@ -60,7 +63,8 @@ needs.
   feedback.
 - **Further: a worked example.** A solved case with its steps labelled. The
   question that follows is **faded**: the same kind of case with the key step
-  left to them.
+  left to them. Tag it `taught`, as every question on an idea this session
+  has already explained or corrected; a case they try first carries no tag.
 - **Held:** its bare name.
 
 Reach for **contrasting cases** (two cases that differ in the one feature
@@ -87,11 +91,28 @@ about other ideas:
   (`kioku unmet -h`), adding those that have no entry first. A name left
   unmarked still gets a real question before anything builds on it.
 - **Interleaving**: an idea from a neighbouring area, or one a few edges from
-  the step whose R has dropped (`kioku context <area>` lists them with R).
+  the step whose R has dropped (`kioku context <idea> --near` lists both, lowest
+  R first).
 
 Judge how many from how much near the work is unsettled and how long they
 have. Record each answer as it is graded, and spend at most one line of the
-turn on recording.
+turn on recording. `kioku log` shows what this session has asked and what is
+still open; read it when your context was cut.
+
+## The notebook
+
+When `kioku profile` names a notebook, it is the learner's reference: they may
+have it open while they answer.
+
+- **Write the note when the step's answers are right.** `kioku note <idea>`
+  prints its path and makes the skeleton: the statement and links along the
+  idea's edges. Below the marked line write what they will look up: the
+  formula or signature, one example, a figure where it helps. Terse.
+- **Ask what a note cannot answer**: which idea applies, why it holds, what
+  breaks without it, a new case. A question whose answer can be read off the
+  note measures nothing.
+- **Point to notes instead of repeating them**: an idea with a note (`kioku
+  context` shows `note:`) is its name and the path.
 
 ## Writing the turn
 

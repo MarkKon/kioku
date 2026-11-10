@@ -52,7 +52,8 @@ by building it, so the step has no lesson of its own. The turn holds:
    red by design.
 4. **Pieces.** The materials (below), each sized by its own evidence: a held
    piece is its bare name; any other gets its signature, what it returns or
-   changes, and an example.
+   changes, and an example, or its name and the path of its notebook note
+   when it has one.
 5. **Questions**, in one block:
    - the step's one design decision, as a question they can reason out from
      what they hold;

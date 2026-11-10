@@ -20,6 +20,8 @@ learner), and the general skills that use it. Keep it that way.
   scheduling and better memory models are later, swappable work.
 - States stay few and simple, and every answer is written the moment it is
   graded.
+- The notebook is reference the agent writes for the learner to look things up
+  in. It is never evidence, and the model does not read it.
 
 `PHILOSOPHY.md` gives the reason for each rule, and `GLOSSARY.md` the words.
 A change that bends a principle updates it there first and adds a dated line
@@ -31,7 +33,7 @@ model is the seam for later work: only `memory.recall` knows how R is computed.
 The CLI and the skills in `skills/` (`kioku`, always loaded; `learn`, which
 runs lessons; `pair`, which pair-programs) change together: a command change
 updates every skill that uses it in the same commit. Formats live in the CLI's
-help (`kioku ask -h`, `add -h`, `observed -h`, `unmet -h`); skills point there
-rather than repeat them. How a turn teaches is written once, in
+help (`kioku ask -h`, `add -h`, `observed -h`, `unmet -h`, `note -h`); skills
+point there rather than repeat them. How a turn teaches is written once, in
 `skills/kioku/turn.md`; `learn` and `pair` point there too. Run `uv run
 pytest` before committing.

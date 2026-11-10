@@ -90,11 +90,14 @@ Open with "Step k of N", then write the teaching turn.
    different, where nothing names the idea, and that needs each step again.
 2. After their reply: the verdicts, then coverage in one line from `kioku
    context` on the route ("route: 9 ideas, all asked, mean R .8").
-3. The results worth a note, for them to write.
+3. With a notebook: a map of the lesson, an index note in its `notes/` folder
+   (`type: index` in the frontmatter) that links the lesson's notes in the
+   order they were taught, a line each. Without one: the results worth a
+   note, for them to write.
 
 ## Across sessions
 
 A lesson that stops before the close writes `LESSON.md` in the working
 folder: the goal as agreed, the plan, and "next: step k of N". The next
-session reads it, and its opening turn asks the steps taught so far again
-alongside the next step.
+session reads it and `kioku log --since 2d`, and its opening turn asks the
+steps taught so far again alongside the next step.

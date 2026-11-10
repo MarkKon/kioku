@@ -71,31 +71,30 @@ The four kinds of idea cover this when read as four questions: what it means
 
 ## Not built yet
 
-Built with the turn: `kioku unmet`, which records the names marked never met
-in a triage, and a question block without a size limit.
+Built with the turn, on 2026-11-10:
 
-Still to build, smallest first:
+- `kioku unmet` records the names marked never met in a triage; an idea last
+  answered that way reads `unmet`, apart from a wrong answer.
+- A question block has no size limit.
+- `kioku ask` adds the ideas written above its block.
+- `kioku log --since 3h` lists what was asked and answered lately.
+- `kioku context <idea> --near` lists the ideas around one, lowest R first.
+- An item tagged `taught` marks its answer as given after teaching in the
+  same session.
+- The notebook: `kioku note <idea>` makes a note's skeleton and the area
+  indexes; the agent writes the body and a map of each lesson.
 
-- `kioku log --since 3h`: what was asked and answered in this session, so an
-  agent can pick a lesson up after its context was cut.
-- `kioku context <idea> --near`: the ideas a few edges away and in
-  neighbouring areas, with R, for interleaving. Until then, `kioku context
-  <area>`.
-- "Never met" shown apart from a wrong answer. Both read R .00 today.
-- `kioku ask` accepting new ideas in the same call as the questions about
-  them. Today an unrecorded idea needs `kioku add` first, which is when agents
-  skip the question.
-- A mark for answers given after teaching in the same session, so the memory
-  model can tell what was learned today from what was held before. It replaces
-  `pre`, which `learn` no longer uses.
-- Answers that record what happened in place of the grades again, hard, good
-  and easy: the outcome (right, partly, wrong, never met), the confidence
+Still to build:
+
+- **Answers that record what happened** in place of the grades again, hard,
+  good and easy: the outcome (right, partly, wrong, never met), the confidence
   digit read against the learner's own record, the help given, and what
-  verified it (a key, the learner, the agent, a test).
-- The notebook: a folder of notes the agent writes, one per idea, when a
-  step's answers are right, with an index per area and per lesson. The learner
-  may have it open while answering, so questions ask what cannot be read off
-  a note, and R comes to mean "can use it with the notebook open".
+  verified it (a key, the learner, the agent, a test). This changes the format
+  of every evidence line, so it starts with a dry run on a copy of a real
+  model.
+- **A memory model that reads `taught`**: a right answer to an idea never
+  taught is old knowledge and should start with a long stability; a right
+  answer on the day of teaching should start short.
 
 ## Not decided
 

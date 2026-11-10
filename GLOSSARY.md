@@ -114,8 +114,9 @@ How an answer went: again, hard, good or easy; a guess carries none.
 ## What the model says
 
 **R**:
-The probability that the learner recalls an idea now, computed by the memory
-model from that idea's evidence.
+The probability that the learner can recall and use an idea now, with their
+notebook open when they keep one, computed by the memory model from that
+idea's evidence.
 _Avoid_: mastery, score, retention, recall (as a depth)
 
 **Memory model**:
@@ -131,6 +132,11 @@ _Avoid_: progress, completion
 Looking up the ideas a next step leans on, and asking what the lookup does not
 settle.
 _Avoid_: brief (for a single lookup), quiz
+
+**Notebook**:
+A folder of notes the agent writes for the learner to look things up in, one
+note per idea; never evidence.
+_Avoid_: vault (the learner's own notes), lecture notes, wiki
 
 ## How it is taught
 

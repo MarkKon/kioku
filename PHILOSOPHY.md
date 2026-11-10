@@ -406,6 +406,24 @@ forgetting. Such a model is judged by how well it predicts answers held out
 from the log (as ALEKS validates its assessments), not by how plausible its
 rules sound. Until one does better, R comes from the idea's own answers.
 
+### 13. The notebook is open
+
+A learner may keep a notebook: a folder of notes the agent writes, one per
+idea, when a step's answers are right. A note holds what is looked up, not
+what is understood: the statement, the formula or signature, one example, a
+figure. The learner may have it open while they answer.
+
+So R is the chance they can recall and use an idea with their notebook open.
+That is the knowledge work needs. Nobody has to carry every formula and every
+signature in their head, and a question that only asks for one measures
+memory of the wording. Questions ask what a note cannot answer: which idea
+applies, why it holds, what breaks without it.
+
+The notebook is never evidence, and the model does not read it. It follows
+the graph: a note is named by its idea's id, its links are the idea's edges,
+and an index note per area lists what is there. The learner's own notes stay
+their own, written by hand; the notebook is where they condense from.
+
 ## Ideas it draws on
 
 The first group is where the idea came from. The rest are related work found
@@ -474,6 +492,9 @@ log below.
   answer given on the day an idea was taught shows understanding, not memory.
   How the model should tell the two apart, and how a lesson should add new
   ideas rather than treat them like old ones, is the next question after v1.
+  An answer now records whether the idea was taught earlier in the same
+  session (`taught`), which is the data that question needs; the memory model
+  does not read it yet.
 - **Do agents mark edges consistently?** The needs and uses tests and the four
   tests for an idea are meant to give the same answer whichever agent applies
   them. If they do not, the rules need sharpening before the data is worth
@@ -599,3 +620,14 @@ Newest last. Add an entry whenever a principle is added, changed or dropped.
   question block has no fixed size. "Never met it" can be said to a list of
   names (a triage, recorded with `kioku unmet`): a claim of not knowing is
   taken at its word, a claim of knowing is still tested.
+- **2026-11-10.** Principle 13: the notebook. The agent writes one note per
+  idea it has taught, the learner may keep it open while answering, and R is
+  read as recall and use with the notebook open. It answers two things use
+  showed: lessons ended with "what should go in my notes?", and questions
+  that asked for a formula measured the wrong thing.
+- **2026-11-10.** An answer records whether its idea was taught earlier in the
+  same session (`taught`), as data for a later memory model (principle 12).
+  "Never met" is shown as `unmet`, apart from a wrong answer, and counted in
+  an area's coverage. `kioku ask` adds the ideas written above its block, so
+  asking about an unrecorded idea is one call. `kioku log` and `kioku context
+  --near` give an agent what a session asked and what lies around an idea.

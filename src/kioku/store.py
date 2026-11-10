@@ -34,7 +34,7 @@ HEADERS = {
     "evidence.md": "# Evidence\n\n"
     "<!-- One line per answer, written by `kioku answer`, `kioku observed` and `kioku unmet`:\n"
     "     - YYYY-MM-DDTHH:MM <id> pick|write|say|observed|triage <grade> [confidence] [mis|unseen|pre]"
-    " [state|use|transfer] q_<ask>/<n> — <what they answered> -->\n\n",
+    " [state|use|transfer] [taught] q_<ask>/<n> — <what they answered> -->\n\n",
     "profile.md": "# Learner profile\n\n"
     "<!-- Who the learner is. Every agent reads this once per session (`kioku profile`)\n"
     "     to pitch its work at their level. Free text: fill in what helps, delete the rest. -->\n\n"
@@ -56,6 +56,7 @@ ANSWER_RE = re.compile(
     r"(?: (?P<conf>[0-9]))?"
     r"(?: (?P<flag>mis|unseen|pre))?"
     r"(?: (?P<depth>" + "|".join(DEPTHS) + r"))?"
+    r"(?: (?P<taught>taught))?"
     r" (?P<ask>" + QID + r")/(?P<n>\d+)"
     r"(?:\s+—\s*(?P<note>.*))?\s*$")
 HEAD_RE = re.compile(r"^## (?P<name>\S+) · (?P<kind>\S+) · (?P<third>\S+)\s*$")
@@ -251,7 +252,7 @@ class Store:
             a = parse_answer(line)
             if a is None:
                 problems.append(f"evidence.md:{n}: want `- YYYY-MM-DDTHH:MM <id> <kind> <grade> "
-                                f"[conf] [mis|unseen] [depth] q_<ask>/<n> — note`")
+                                f"[conf] [mis|unseen] [depth] [taught] q_<ask>/<n> — note`")
             elif a.grade == "guess" and a.kind != "pick":
                 problems.append(f"evidence.md:{n}: only a pick can be a guess")
             else:
@@ -350,7 +351,7 @@ def parse_answer(line: str) -> Answer | None:
     at = dt.datetime.fromisoformat(f"{m['day']}T{m['time'] or '12:00'}")
     return Answer(at=at, id=m["id"], kind=m["kind"], grade=m["grade"], ask=m["ask"],
                   n=int(m["n"]), conf=int(m["conf"]) if m["conf"] else None, flag=m["flag"],
-                  depth=m["depth"], note=m["note"] or "")
+                  depth=m["depth"], note=m["note"] or "", taught=bool(m["taught"]))
 
 
 def format_answer(a: Answer) -> str:
@@ -361,6 +362,8 @@ def format_answer(a: Answer) -> str:
         parts.append(a.flag)
     if a.depth:
         parts.append(a.depth)
+    if a.taught:
+        parts.append("taught")
     parts.append(f"{a.ask}/{a.n}")
     note = " ".join(a.note.split())
     return "- " + " ".join(parts) + (f" — {note}" if note else "")
