@@ -9,7 +9,9 @@ IDEA_KINDS = ("definition", "result", "proof", "method")
 ASK_KINDS = ("pick", "write", "say")  # the item kinds of a question block
 ANSWER_KINDS = (*ASK_KINDS, "observed", "triage")  # observed: a step of verified work;
 # triage: a name the learner marked as never met
-GRADES = ("again", "hard", "good", "easy")  # `guess` is recorded but carries no grade
+# what happened: `guess` is a right pick at chance confidence, `unmet` a "never met it"
+OUTCOMES = ("right", "partly", "wrong", "unmet", "guess")
+HELPS = ("hint", "shown")  # help beyond the brief; handed the answer. None: done alone
 DEPTHS = ("state", "use", "transfer")
 
 
@@ -41,14 +43,20 @@ class Answer:
     at: dt.datetime  # when it was answered (a line with only a date reads as noon)
     id: str  # the idea it is about
     kind: str  # pick, write, say, observed or triage
-    grade: str  # again, hard, good, easy, or guess
+    outcome: str  # right, partly, wrong, unmet or guess
     ask: str  # the question block (or observed record), q_…
     n: int  # the item's number in its block
     conf: int | None = None  # their confidence digit, for a pick
-    flag: str | None = None  # mis: a misconception; unseen: never met it; pre: before teaching
+    flag: str | None = None  # mis: a misconception; pre: before teaching
     depth: str | None = None  # what the question demanded: state, use, transfer
     note: str = ""
     taught: bool = False  # the session explained the idea before this question
+    help: str | None = None  # hint or shown; None: without help
+
+    @property
+    def right(self) -> bool:
+        """Right or nearly, by their own doing."""
+        return self.outcome in ("right", "partly") and self.help != "shown"
 
     @property
     def day(self) -> dt.date:

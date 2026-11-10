@@ -84,17 +84,17 @@ Built with the turn, on 2026-11-10:
 - The notebook: `kioku note <idea>` makes a note's skeleton and the area
   indexes; the agent writes the body and a map of each lesson.
 
+- An answer records what happened (right, partly, wrong, never met; the
+  confidence digit; the help a step took) in place of the grades again, hard,
+  good and easy. The memory model reads confidence against the learner's own
+  record, and starts a right first answer to an untaught idea at thirty days
+  of stability.
+
 Still to build:
 
-- **Answers that record what happened** in place of the grades again, hard,
-  good and easy: the outcome (right, partly, wrong, never met), the confidence
-  digit read against the learner's own record, the help given, and what
-  verified it (a key, the learner, the agent, a test). This changes the format
-  of every evidence line, so it starts with a dry run on a copy of a real
-  model.
-- **A memory model that reads `taught`**: a right answer to an idea never
-  taught is old knowledge and should start with a long stability; a right
-  answer on the day of teaching should start short.
+- **Fitting the memory model on the learner's own answers.** The thirty days
+  for old knowledge, and how much a hint or a slip counts, are placeholders
+  until there are enough later-day answers to fit them (principle 12).
 
 ## Not decided
 

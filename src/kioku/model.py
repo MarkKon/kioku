@@ -11,9 +11,6 @@ from .records import DEPTHS, Answer, Idea
 from .store import Snapshot
 from .text import matches, norm
 
-RIGHT = ("hard", "good", "easy")
-
-
 @dataclass(frozen=True)
 class Coverage:
     ideas: int
@@ -46,6 +43,7 @@ class Model:
         for a in self.answers:
             self._by_id.setdefault(a.id, []).append(a)
         self._recall: dict[str, memory.Recall] = {}
+        self.calibration = memory.calibration(self.answers)
         # edges by id; an edge to a name that does not resolve is kept out (lint reports it)
         self.needs = {i.id: [x for n in i.needs if (x := self.by_name.get(n))]
                       for i in self.ideas.values()}
@@ -80,12 +78,12 @@ class Model:
 
     def recall(self, iid: str) -> memory.Recall:
         if iid not in self._recall:
-            self._recall[iid] = memory.recall(self.answers_for(iid), self.now)
+            self._recall[iid] = memory.recall(self.answers_for(iid), self.now, self.calibration)
         return self._recall[iid]
 
     def deepest(self, iid: str) -> str | None:
         """The deepest depth the idea was answered right at."""
-        shown = {a.depth for a in self.answers_for(iid) if a.grade in RIGHT and a.depth}
+        shown = {a.depth for a in self.answers_for(iid) if a.right and a.depth}
         return next((d for d in reversed(DEPTHS) if d in shown), None)
 
     # -- areas
@@ -116,7 +114,7 @@ class Model:
     def unmet(self, iid: str) -> bool:
         """The latest answer says they have never met the idea."""
         last = self.recall(iid).last
-        return bool(last and last.flag == "unseen")
+        return bool(last and last.outcome == "unmet")
 
     def near(self, iid: str, steps: int = 2) -> list[tuple[str, str]]:
         """Ideas close to this one, as (where, id): within `steps` edges in either

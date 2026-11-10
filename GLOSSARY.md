@@ -85,12 +85,13 @@ The few questions put to the learner at once, answered in one line.
 _Avoid_: quiz, ask
 
 **Answer**:
-The learner's graded reply to one question, recorded the moment it is graded.
+The learner's reply to one question and how it went, recorded the moment it
+is read.
 _Avoid_: response, review
 
 **Observed work**:
-A step the learner did in pairing that a test verified, graded by the help it
-took.
+A step the learner did in pairing that a test verified, recorded with the help
+it took.
 _Avoid_: demo, usage
 
 **Triage**:
@@ -108,8 +109,18 @@ What a question demanded of the idea: state it, use it when it is named, or
 transfer it to a setting where nothing points to it.
 _Avoid_: level, mastery level
 
-**Grade**:
-How an answer went: again, hard, good or easy; a guess carries none.
+**Outcome**:
+How an answer went: right, partly (right with a slip), wrong, or never met; a
+guess is a right pick at chance confidence, recorded and not counted.
+_Avoid_: grade, score, rating
+
+**Help**:
+What a step of observed work took: done alone, with a hint, or shown the
+answer.
+
+**Confidence**:
+The digit a learner puts on a pick; the memory model reads it against their
+own share of right picks at that digit.
 
 ## What the model says
 
@@ -164,6 +175,8 @@ _Avoid_: curriculum, syllabus
 
 ## Retired terms (v0)
 
+**Grade** (again, hard, good, easy): now an outcome, with the confidence and
+help recorded beside it; old evidence lines are still read.
 **Proposition**: now an idea.
 **Chain**: now a proof idea and its edges; a chain that only recorded teaching
 order is dropped.

@@ -33,7 +33,8 @@ FIELDS = ("needs", "uses", "aliases", "vault")
 HEADERS = {
     "evidence.md": "# Evidence\n\n"
     "<!-- One line per answer, written by `kioku answer`, `kioku observed` and `kioku unmet`:\n"
-    "     - YYYY-MM-DDTHH:MM <id> pick|write|say|observed|triage <grade> [confidence] [mis|unseen|pre]"
+    "     - YYYY-MM-DDTHH:MM <id> pick|write|say|observed|triage right|partly|wrong|unmet|guess [confidence]"
+    " [hint|shown] [mis|pre]"
     " [state|use|transfer] [taught] q_<ask>/<n> — <what they answered> -->\n\n",
     "profile.md": "# Learner profile\n\n"
     "<!-- Who the learner is. Every agent reads this once per session (`kioku profile`)\n"
@@ -52,8 +53,9 @@ ARCHIVE_HEADER = ("# Archive\n\nNot evidence: lines set aside, e.g. the answers 
 ANSWER_RE = re.compile(
     r"^- (?P<day>\d{4}-\d{2}-\d{2})(?:T(?P<time>\d{2}:\d{2}))? (?P<id>" + ID + r")"
     r" (?P<kind>pick|write|say|observed|triage)"
-    r" (?P<grade>again|hard|good|easy|guess)"
+    r" (?P<outcome>right|partly|wrong|unmet|guess|again|hard|good|easy)"
     r"(?: (?P<conf>[0-9]))?"
+    r"(?: (?P<help>hint|shown))?"
     r"(?: (?P<flag>mis|unseen|pre))?"
     r"(?: (?P<depth>" + "|".join(DEPTHS) + r"))?"
     r"(?: (?P<taught>taught))?"
@@ -207,6 +209,22 @@ class Store:
             self._archive(f"{day} · {ask}/{n}", why, moved)
         return moved
 
+    def normalise(self) -> int:
+        """Rewrite evidence lines that are not in the current format (a grade where the
+        outcome goes); returns how many. What a line says does not change."""
+        changed = 0
+
+        def norm(x: str) -> str:
+            nonlocal changed
+            a = parse_answer(x) if x.startswith("- ") else None
+            if a is None or format_answer(a) == x.rstrip():
+                return x
+            changed += 1
+            return format_answer(a)
+
+        self._rewrite("evidence.md", norm)
+        return changed
+
     def save_ask(self, ask: dict) -> None:
         self.init()
         (self.home / "asks" / f"{ask['id']}.json").write_text(
@@ -251,9 +269,9 @@ class Store:
                 continue
             a = parse_answer(line)
             if a is None:
-                problems.append(f"evidence.md:{n}: want `- YYYY-MM-DDTHH:MM <id> <kind> <grade> "
-                                f"[conf] [mis|unseen] [depth] [taught] q_<ask>/<n> — note`")
-            elif a.grade == "guess" and a.kind != "pick":
+                problems.append(f"evidence.md:{n}: want `- YYYY-MM-DDTHH:MM <id> <kind> <outcome> "
+                                f"[conf] [hint|shown] [mis|pre] [depth] [taught] q_<ask>/<n> — note`")
+            elif a.outcome == "guess" and a.kind != "pick":
                 problems.append(f"evidence.md:{n}: only a pick can be a guess")
             else:
                 answers.append(a)
@@ -349,15 +367,35 @@ def parse_answer(line: str) -> Answer | None:
     if not m:
         return None
     at = dt.datetime.fromisoformat(f"{m['day']}T{m['time'] or '12:00'}")
-    return Answer(at=at, id=m["id"], kind=m["kind"], grade=m["grade"], ask=m["ask"],
-                  n=int(m["n"]), conf=int(m["conf"]) if m["conf"] else None, flag=m["flag"],
-                  depth=m["depth"], note=m["note"] or "", taught=bool(m["taught"]))
+    outcome, help_, flag = _outcome(m["kind"], m["outcome"], m["help"], m["flag"])
+    return Answer(at=at, id=m["id"], kind=m["kind"], outcome=outcome, ask=m["ask"],
+                  n=int(m["n"]), conf=int(m["conf"]) if m["conf"] else None, flag=flag,
+                  depth=m["depth"], note=m["note"] or "", taught=bool(m["taught"]), help=help_)
+
+
+def _outcome(kind: str, word: str, help_: str | None,
+             flag: str | None) -> tuple[str, str | None, str | None]:
+    """The outcome, help and flag of a line. Lines written before 2026-11-10 carry a
+    grade (again, hard, good, easy) and the flag `unseen`; they are read as what happened."""
+    if flag == "unseen":
+        return "unmet", None, None
+    if word in ("right", "partly", "wrong", "unmet", "guess"):
+        return word, help_, flag
+    if kind == "observed":  # graded by the help the step took
+        return "right", {"again": "shown", "hard": "hint"}.get(word), flag
+    if word == "again":
+        return "wrong", None, flag
+    if word == "hard" and kind != "pick":  # a slip; a pick's "hard" only meant low confidence
+        return "partly", None, flag
+    return "right", None, flag
 
 
 def format_answer(a: Answer) -> str:
-    parts = [f"{a.at:%Y-%m-%dT%H:%M}", a.id, a.kind, a.grade]
+    parts = [f"{a.at:%Y-%m-%dT%H:%M}", a.id, a.kind, a.outcome]
     if a.conf is not None:
         parts.append(str(a.conf))
+    if a.help:
+        parts.append(a.help)
     if a.flag:
         parts.append(a.flag)
     if a.depth:

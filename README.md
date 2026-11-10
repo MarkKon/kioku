@@ -52,7 +52,8 @@ in your own skills folder; they load the kioku skill and follow its check.
    question block (`kioku ask`): multiple choice with a confidence digit, a
    formula written by hand, or one free line.
 3. **Record.** The learner's one-line reply goes to `kioku answer`, which
-   grades it and records the evidence at once.
+   records at once what happened: right, partly, wrong or never met, with
+   their confidence.
 
 Ideas are added with `kioku add` (blocks on stdin), changed or moved with
 `kioku edit`, and removed with `kioku rm`, which moves any answers to
@@ -65,7 +66,9 @@ ideas around one, lowest R first.
 
 Evidence comes only from questions asked and answered and from verified work,
 never from conversation or self-report. A memory model (FSRS-6 for now, on
-elapsed time to the minute) turns each idea's answers into R. The model is
+elapsed time to the minute) turns each idea's answers into R: it reads a
+pick's confidence against your own record at that digit, and takes a right
+first answer to an idea nobody taught you as knowledge you had already. The model is
 plain files in a git repo: one markdown file per area, holding its ideas
 (name, kind, statement, and edges marked needs or uses), and one line per
 answer.
@@ -120,7 +123,7 @@ pushes when it has a remote) and to list duplicates and areas worth splitting.
 | `store.py`     | the model folder, its area files and its line formats     |
 | `memory.py`    | the memory model: answers → R (swap this for a better one) |
 | `model.py`     | the model in memory: names, edges, areas and coverage, search, recall per idea |
-| `questions.py` | question blocks: parse, render, grade replies             |
+| `questions.py` | question blocks: parse, render, read replies              |
 | `vault.py`     | the optional notes folder, read only                      |
 | `notebook.py`  | the optional notebook: note skeletons and area indexes    |
 | `upkeep.py`    | checks, duplicates, areas to split, calibration, backup, drafting |

@@ -134,15 +134,16 @@ def grade_reply(ask: dict, reply: str, now: dt.datetime, redo: bool = False) -> 
     return g
 
 
-def grade_say(ask: dict, n: int, grade: str, now: dt.datetime, mis: str | None = None,
+def grade_say(ask: dict, n: int, outcome: str, now: dt.datetime, mis: str | None = None,
               note: str | None = None) -> Answer:
-    """The agent's grade for an answered item (a say item, or a regrade)."""
+    """The agent's judgement of an answered item (a say item, or a regrade): right,
+    partly or wrong."""
     it = ask["items"][n - 1]
     it["state"] = "done"
     text = f"misconception: {mis}" if mis else note or short(it.get("answer", ""), 80) \
         or "graded by the agent"
     flag = "pre" if it.get("pre") else "mis" if mis else None
-    return Answer(now, it["id"], it["kind"], grade, ask["id"], n,
+    return Answer(now, it["id"], it["kind"], outcome, ask["id"], n,
                   flag=flag, depth=it.get("depth"), note=text, taught=bool(it.get("taught")))
 
 
@@ -174,17 +175,17 @@ def _grade_item(qid: str, it: dict, tok: str, thoughts: str,
     said = f" · “{short(thoughts, 80)}”" if thoughts else ""
     right = next((o for o in it["options"] if o["correct"]), {"text": "", "mis": ""})
 
-    def answer(grade, note, conf=None, flag=None):
+    def answer(outcome, note, conf=None, flag=None):
         if it.get("pre"):  # before teaching: kept as data, skipped by the memory model
             flag = "pre"
-        return Answer(now, it["id"], kind, grade, qid, n, conf, flag, it.get("depth"),
+        return Answer(now, it["id"], kind, outcome, qid, n, conf, flag, it.get("depth"),
                       note + said, bool(it.get("taught")))
 
     if tok == "-":
-        return "never met", answer("again", "never met it", flag="unseen"), True
+        return "never met", answer("unmet", "never met it"), True
     if tok == "?":
         return ("seen, not producible — it is: " + (it["ref"] or right["text"]),
-                answer("again", "seen it, could not produce it"), True)
+                answer("wrong", "seen it, could not produce it"), True)
     if kind == "pick":
         if not re.fullmatch(r"[a-h][0-9]?", tok):
             return f"wants a letter and a confidence digit, e.g. `{n}b8`", None, False
@@ -195,11 +196,11 @@ def _grade_item(qid: str, it: dict, tok: str, thoughts: str,
         unsure = "" if len(tok) > 1 else " (no confidence given, read as 5)"
         chosen = it["options"][k]
         if chosen["correct"]:
-            grade = "good" if conf >= 8 else "hard" if conf / 10 > 1 / len(it["options"]) else "guess"
-            verdict = {"good": "✓ solid", "hard": "✓ fragile", "guess": "✓ but a guess"}[grade]
-            why = f". {it['why']}" if it["why"] and grade != "good" else ""
-            return (f"{verdict} — {tok[0]} at {conf}0%{unsure}{why}",
-                    answer(grade, f"picked {short(chosen['text'], 50)}", conf), True)
+            guess = conf / 10 <= 1 / len(it["options"])  # no surer than chance
+            why = f". {it['why']}" if it["why"] and conf < 8 else ""
+            return (f"{'✓ but a guess' if guess else '✓'} — {tok[0]} at {conf}0%{unsure}{why}",
+                    answer("guess" if guess else "right", f"picked {short(chosen['text'], 50)}",
+                           conf), True)
         mis = conf >= 8
         letter = string.ascii_lowercase[it["options"].index(right)]
         if mis:
@@ -211,17 +212,17 @@ def _grade_item(qid: str, it: dict, tok: str, thoughts: str,
                  f"Right: **{letter})** {right['text']}"
                  + (f". _{chosen['mis']}_" if chosen["mis"] and mis else "")
                  + (f". {it['why']}" if it["why"] else ""))
-        return shown, answer("again", note, conf, "mis" if mis else None), True
+        return shown, answer("wrong", note, conf, "mis" if mis else None), True
     if kind == "write":
         if tok == ".":
             it["state"] = "shown"
             return (f"compare with: {it['ref']}  \n"
                     f"  reply `{n}=` matches · `{n}~` small slip · `{n}x` wrong"), None, False
         if tok in ("=", "~", "x"):
-            grade = {"=": "good", "~": "hard", "x": "again"}[tok]
+            outcome = {"=": "right", "~": "partly", "x": "wrong"}[tok]
             note = {"=": "wrote it correctly", "~": "wrote it with a small slip",
                     "x": "could not write it"}[tok]
-            return f"{'✗' if tok == 'x' else '✓'} {note}", answer(grade, note), True
+            return f"{'✗' if tok == 'x' else '✓'} {note}", answer(outcome, note), True
         return f"wants `{n}.` then `{n}=`, `{n}~` or `{n}x`", None, False
     if tok != ":" and not thoughts:  # say
         return f"wants `{n}: <answer>`", None, False

@@ -124,8 +124,8 @@ def calibration(m: Model) -> dict[int, tuple[int, float]]:
     """Confidence digit → (picks, share right)."""
     bins: dict[int, list[bool]] = {}
     for a in m.answers:
-        if a.kind == "pick" and a.conf is not None and a.flag not in ("unseen", "pre"):
-            bins.setdefault(a.conf, []).append(a.grade != "again")
+        if a.kind == "pick" and a.conf is not None and a.flag != "pre" and a.outcome != "unmet":
+            bins.setdefault(a.conf, []).append(a.outcome in ("right", "guess"))
     return {c: (len(xs), sum(xs) / len(xs)) for c, xs in sorted(bins.items())}
 
 
@@ -159,6 +159,10 @@ def run(cfg: Config, store: Store, m: Model, vault: Vault | None,
                   else f"check: ok · {len(m.ideas)} ideas, {len(m.areas)} areas, "
                        f"{len(m.answers)} answers")
     report += _backup(cfg.home, cfg.today)
+    rewritten = store.normalise()
+    if rewritten:
+        report.append(f"evidence: {rewritten} line(s) rewritten in the current format "
+                      f"(they are as they were in the backup just made)")
     d = dupes(m)
     if d:
         report.append("likely duplicates (merge by hand):\n" + "\n".join(d))
@@ -168,8 +172,10 @@ def run(cfg: Config, store: Store, m: Model, vault: Vault | None,
                       "--new-area`):\n" + "\n".join(s))
     bins = calibration(m)
     if bins:
-        report.append("confidence digits (conf · picks · right):\n" + "\n".join(
-            f"  {c}  {n:>3}  {right:>4.0%}" for c, (n, right) in bins.items()))
+        report.append("confidence digits (conf · picks · right · read by the memory model "
+                      "as):\n" + "\n".join(
+            f"  {c}  {n:>3}  {right:>4.0%}  {m.calibration.get(c, c / 10):>4.0%}"
+            for c, (n, right) in bins.items()))
     if vault:
         report.append(_draft(cfg, store, m, vault, draft, limit, timeout))
     return "\n\n".join(report)

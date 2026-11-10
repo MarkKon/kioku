@@ -24,7 +24,8 @@ re-derivation.
 - **Edges**: X **needs** Y when they cannot follow X's statement without Y;
   X **uses** Y when doing X carries Y out.
 - **Evidence** is an answer to a question asked here, or a pairing step they
-  typed and a test verified. Nothing else moves a number: what they said in
+  typed and a test verified. It records what happened (right, partly, wrong,
+  never met; their confidence; the help it took), never a grade. Nothing else moves a number: what they said in
   passing, what you taught, what they say they know, what their notes say.
 - **R** is the probability they can recall and use an idea now, with their
   notebook open when they keep one, from that idea's own evidence. No answers
@@ -68,8 +69,8 @@ A **question block** is numbered questions answered in one line. Write
 it, pipe it into `kioku ask` (format and example: `kioku ask -h`), and copy the
 block it prints between the lines into your reply, verbatim: they never see
 tool output, and the block you wrote holds the answer key. Pass their
-reply on as typed: `kioku answer <q_id> "<reply>"`, and grade say items with
-`--say N=good|hard|again`. Answer every ✗ in prose: the right answer and, for
+reply on as typed: `kioku answer <q_id> "<reply>"`, and judge say items with
+`--say N=right|partly|wrong`. Answer every ✗ in prose: the right answer and, for
 a misconception, why the wrong one tempts.
 
 **Triage** finds out fast what they have never met: show a lettered list of
@@ -82,7 +83,7 @@ it or earlier in the conversation, in their notation; answerable without the
 other items), you solved it yourself first, and each wrong option is the
 answer a specific wrong model would give.
 Prefer applying an idea to reciting it. [questions.md](questions.md) has the
-full rules, the grades, and how to set aside an answer that should not count;
+full rules, what an answer records, and how to set aside an answer that should not count;
 read it before your first block in a session.
 
 ## Teaching
@@ -94,7 +95,7 @@ a turn does, and how it adapts to their last reply.
 ## Observed work
 
 In pairing, after a step's tests pass, record the ideas it exercised in one
-call, graded by the help it took: `kioku observed name=good|hard|again …
+call, with the help it took: `kioku observed name=alone|hint|shown …
 --step "…"` (`kioku observed -h`). Report it in one line.
 
 ## Adding ideas

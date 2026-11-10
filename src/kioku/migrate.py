@@ -242,7 +242,9 @@ def apply(home: Path, table: Path, out: Path, check: bool) -> int:
     for line in (home / "evidence.md").read_text().splitlines():
         a = parse_answer(line)
         if a and a.kind == "say" and a.note.startswith("observed:"):
-            line = format_answer(dataclasses.replace(a, kind="observed"))
+            help_ = {"wrong": "shown", "partly": "hint"}.get(a.outcome)
+            line = format_answer(dataclasses.replace(a, kind="observed", outcome="right",
+                                                     help=help_))
             observed += 1
         lines.append(line)
     (out / "evidence.md").write_text("\n".join(lines) + "\n")

@@ -279,10 +279,10 @@ into a real hunt, say so and debug it together, hypothesis by hypothesis.
 - **Answers**: pass their reply to `kioku answer` as you open the next turn,
   and record the names they marked never met with `kioku unmet`.
 - **The step**: when its tests turn green, record every idea it carried out
-  as observed work (`kioku observed -h`), graded by the help it took: the
-  method and the API pieces both, since the pieces' R is what reduces them to
-  a bare name. Report it in one line of the next turn's feedback ("Recorded:
-  `causal-attention-head` hard, `module-list` good").
+  as observed work (`kioku observed -h`), with the help it took (alone, hint,
+  shown): the method and the API pieces both, since the pieces' R is what
+  reduces them to a bare name. Report it in one line of the next turn's
+  feedback ("Recorded: `causal-attention-head` hint, `module-list` alone").
 
 ## Close
 

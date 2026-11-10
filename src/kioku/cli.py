@@ -27,7 +27,7 @@ from typing import NoReturn
 from . import config, questions, upkeep, view
 from .model import Model
 from .notebook import Notebook
-from .records import GRADES, IDEA_KINDS, Answer, Idea
+from .records import IDEA_KINDS, Answer, Idea
 from .store import AREA, NAME, QID, SEP, Snapshot, Store, block_idea, check_block, \
     format_answer, new_id, parse_blocks
 from .text import short
@@ -94,17 +94,22 @@ def width_for(m: Model, ids: list[str]) -> int:
 
 
 def row(m: Model, iid: str, label: str | None = None, width: int = 30) -> str:
-    """name, kind, R, answers, last answer and its grade, deepest depth shown. With a
+    """name, kind, R, answers, the last answer and how it went, deepest depth shown. With a
     label (`needs`, `used by`; '' continues the one above) the row is indented under it."""
     i, rc = m.ideas[iid], m.recall(iid)
     last = "" if not rc.last else when(m, rc.last.at) if m.unmet(iid) \
-        else f"{when(m, rc.last.at)} {rc.last.grade}"
+        else f"{when(m, rc.last.at)} {went(rc.last)}"
     flags = []
     if rc.last and rc.last.flag == "mis":
         flags.append(f"! misconception: {short(rc.last.note.removeprefix('misconception: '), 70)}")
     head = f"  {label:<11}" if label is not None else "  "
     return (f"{head}{i.name:<{width + 1}}{i.kind:<11}{r_cell(m, iid)}  "
             f"n{rc.n:<3}{last:<12} {m.deepest(iid) or '':<9}" + "  ".join(flags)).rstrip()
+
+
+def went(a: Answer) -> str:
+    """How an answer went, in one word: the help it took, if any, else its outcome."""
+    return a.help or a.outcome
 
 
 def r_cell(m: Model, iid: str) -> str:
@@ -217,7 +222,7 @@ def show_idea(ctx: Context, iid: str, answers: bool):
     i, rc = m.ideas[iid], m.recall(iid)
     unmet = m.unmet(iid)
     last = "" if not rc.last else f" · last {when(m, rc.last.at)}" \
-        + ("" if unmet else f" {rc.last.grade}")
+        + ("" if unmet else f" {went(rc.last)}")
     depth = f" ({m.deepest(iid)})" if m.deepest(iid) else ""
     r = "unmet" if unmet else f"R {fmt_r(rc.r)}"
     print(f"{i.name}{SEP}{i.kind}{SEP}{i.area}{SEP}{r} n{rc.n}{last}{depth}")
@@ -583,13 +588,19 @@ def open_ask(ctx: Context, qid: str) -> dict:
     return ask
 
 
-def item_grade(spec: str, ask: dict) -> tuple[int, str]:
-    n, _, grade = spec.partition("=")
+# the words of before 2026-11-10, still read from agents that learned them
+OLD_OUTCOME = {"good": "right", "easy": "right", "hard": "partly", "again": "wrong"}
+OLD_HELP = {"good": "alone", "hard": "hint", "again": "shown"}
+
+
+def item_outcome(spec: str, ask: dict) -> tuple[int, str]:
+    n, _, word = spec.partition("=")
     if not n.isdigit() or not 0 < int(n) <= len(ask["items"]):
-        die(f"`{spec}`: want <item>=<grade>, e.g. 3=good")
-    if grade not in GRADES:
-        die(f"`{spec}`: the grade is again, hard, good or easy")
-    return int(n), grade
+        die(f"`{spec}`: want <item>=<outcome>, e.g. 3=right")
+    word = OLD_OUTCOME.get(word, word)
+    if word not in ("right", "partly", "wrong"):
+        die(f"`{spec}`: the outcome is right, partly or wrong")
+    return int(n), word
 
 
 def cmd_answer(ctx: Context, a):
@@ -622,8 +633,8 @@ def cmd_answer(ctx: Context, a):
         shown += g.shown
         recorded += len(g.answers)
         waiting += g.to_grade
-    grades = [(item_grade(s, ask), "say") for s in a.say or []] + \
-             [(item_grade(s, ask), "regrade") for s in a.regrade or []]
+    grades = [(item_outcome(s, ask), "say") for s in a.say or []] + \
+             [(item_outcome(s, ask), "regrade") for s in a.regrade or []]
     if a.mis and len(grades) != 1:
         die("--mis goes with exactly one --say or --regrade")
     for (n, grade), how in grades:
@@ -631,16 +642,16 @@ def cmd_answer(ctx: Context, a):
         if it["state"] == "open":
             die(f"item {n} has no answer yet; pass their reply first")
         if how == "say" and it["kind"] != "say":
-            die(f"item {n} is a {it['kind']}; --regrade changes its grade")
-        if a.mis and grade != "again":
-            die("a misconception is graded again")
+            die(f"item {n} is a {it['kind']}; --regrade changes its outcome")
+        if a.mis and grade != "wrong":
+            die("a misconception is a wrong answer: --say N=wrong --mis '…'")
         ctx.store.record(questions.grade_say(ask, n, grade, ctx.cfg.now, a.mis, a.note))
-        shown.append(f"- **{n}** graded {grade}")
+        shown.append(f"- **{n}** {grade}")
         recorded += 1
         waiting = [w for w in waiting if w != n]
     ctx.store.save_ask(ask)
     print("\n".join(shown))
-    notes = [f"grade {n}: kioku answer {ask['id']} --say {n}=good|hard|again "
+    notes = [f"judge {n}: kioku answer {ask['id']} --say {n}=right|partly|wrong "
              f"[--mis 'believed X → Y']" for n in waiting]
     if recorded:
         notes.append(f"{recorded} answer(s) recorded")
@@ -656,8 +667,9 @@ def cmd_observed(ctx: Context, a):
         j = m.resolve(name)
         if j is None:
             die(f"no idea `{name}` (add it with `kioku add`)")
-        if grade not in ("again", "hard", "good"):
-            die(f"`{spec}`: observed work is graded good, hard or again")
+        grade = OLD_HELP.get(grade, grade)
+        if grade not in ("alone", "hint", "shown"):
+            die(f"`{spec}`: observed work is recorded as alone, hint or shown")
         pairs.append((j, grade))
     notes: dict[str, str] = {}
     common = ""
@@ -677,8 +689,8 @@ def cmd_observed(ctx: Context, a):
                         "items": items})
     for k, (j, grade) in enumerate(pairs, 1):
         note = "observed: " + (notes.get(j) or common or "verified by the step's tests")
-        ctx.store.record(Answer(ctx.cfg.now, j, "observed", grade, qid, k, depth="use",
-                                note=note))
+        ctx.store.record(Answer(ctx.cfg.now, j, "observed", "right", qid, k, depth="use",
+                                note=note, help=None if grade == "alone" else grade))
     print(f"{len(pairs)} observed answer(s) recorded under {qid}: "
           + ", ".join(f"{m.name(j)} {g}" for j, g in pairs))
 
@@ -704,7 +716,7 @@ def cmd_unmet(ctx: Context, a):
                         "asked": ctx.cfg.now.isoformat(timespec="seconds"), "triage": True,
                         "items": items})
     for k, j in enumerate(ids, 1):
-        ctx.store.record(Answer(ctx.cfg.now, j, "triage", "again", qid, k, flag="unseen",
+        ctx.store.record(Answer(ctx.cfg.now, j, "triage", "unmet", qid, k,
                                 note="never met it (triage)"))
     print(f"{len(ids)} idea(s) recorded as never met under {qid}: "
           + ", ".join(m.name(j) for j in ids))
@@ -736,11 +748,12 @@ def cmd_log(ctx: Context, a):
                 what = {"to-grade": "answered, not graded yet", "done": "answer set aside",
                         "shown": "reference shown, not graded yet"}.get(it.get("state"), "open")
                 waiting += it.get("state") != "done"
-            elif ans.flag == "unseen":
+            elif ans.outcome == "unmet":
                 what = "never met"
             else:
                 what = " ".join(x for x in (
-                    ans.grade, "" if ans.conf is None else str(ans.conf), ans.flag or "",
+                    ans.outcome, "" if ans.conf is None else str(ans.conf), ans.help or "",
+                    ans.flag or "",
                     ans.depth or "", "taught" if ans.taught else "") if x)
                 what += f" — {short(ans.note, 70)}" if ans.note else ""
             print(f"  {it['n']:>2} {m.name(it['id']):<{w}}  {it['kind']:<8} {what}")
@@ -806,7 +819,7 @@ title. Nothing is added unless the block is stored.
 Replies, all items on one line, e.g. `1b8 2. 3: the variance shrinks`:
   pick   a letter and a confidence digit: `1b8` (option b, 80% sure)
   write  `2.` once written; then `2=` right, `2~` a slip, `2x` wrong
-  say    `3: <free text>`; grade it with `kioku answer <q_id> --say 3=good`
+  say    `3: <free text>`; judge it with `kioku answer <q_id> --say 3=right`
   any    `4-` never met it, `4?` seen it but cannot produce it
 
 The block is stored with its key and printed with its id, options shuffled.
@@ -826,10 +839,15 @@ Example:
 """
 
 ANSWER_FORMAT = """\
-Grades: again (wrong or blank), hard (right with effort or a slip), good (right
-and clean), easy (right and carried to a new setting). A right pick at chance
-confidence is a guess: recorded, no grade. A reply outside the format ("between
-a and b", a letter without a digit) is yours to settle with the learner first.
+An answer records what happened: right, partly (right with a slip), wrong, or
+never met. You judge a say item with --say N=right|partly|wrong; picks and
+write items are settled by the reply. A right pick at chance confidence is a
+guess: recorded, not counted. A wrong pick at 80% or more is a misconception.
+What the answer does to R is the memory model's business: it reads a pick's
+confidence against the learner's own record at that digit.
+
+A reply outside the format ("between a and b", a letter without a digit) is
+yours to settle with the learner first.
 """
 
 ADD_FORMAT = """\
@@ -850,17 +868,17 @@ unknown area (--new-area), an edge that closes a cycle.
 """
 
 OBSERVED_FORMAT = """\
-One call per step, after its tests pass, for each idea the step exercised:
-  good   done clean from the brief and its materials
-  hard   needed help beyond the brief, or a slip
-  again  handed the answer
-An idea taught within the same step gets no grade.
+One call per step, after its tests pass, for each idea the step carried out,
+with the help it took:
+  alone  done from the brief and its materials
+  hint   needed help beyond the brief, or a slip
+  shown  handed the answer
+An idea taught within the same step is left out.
 
 Example:
-  kioku observed register-buffer=hard tensor-broadcasting=good \\
+  kioku observed register-buffer=hint tensor-broadcasting=alone \\
     --step "3 · causal head" --note "register-buffer: needed the device demo"
 """
-
 
 UNMET_FORMAT = """\
 Triage: show the learner a lettered list of idea names in your reply and ask
@@ -944,23 +962,24 @@ def parser() -> argparse.ArgumentParser:
                     help="add an idea written above the block despite a likely duplicate")
     sp.add_argument("--new-area", action="store_true",
                     help="make the area of an idea written above the block")
-    sp = add("answer", cmd_answer, "grade the learner's one-line reply to a block and record it "
-             "now; also grade say items, regrade, retract", ANSWER_FORMAT)
+    sp = add("answer", cmd_answer, "read the learner's one-line reply to a block and record it "
+             "now; also judge say items, change an outcome, retract", ANSWER_FORMAT)
     sp.add_argument("ask", help="the block id, q_…")
     sp.add_argument("reply", nargs="*")
     sp.add_argument("--redo", action="store_true",
                     help="answer an item again; the old answer moves to archive.md")
-    sp.add_argument("--say", action="append", metavar="N=GRADE", help="grade a say item")
-    sp.add_argument("--regrade", action="append", metavar="N=GRADE",
-                    help="change the grade of an answered item")
-    sp.add_argument("--mis", help="the misconception it shows: 'believed X → Y' (grade again)")
+    sp.add_argument("--say", action="append", metavar="N=OUTCOME",
+                    help="judge a say item: right, partly or wrong")
+    sp.add_argument("--regrade", action="append", metavar="N=OUTCOME",
+                    help="change the outcome of an answered item")
+    sp.add_argument("--mis", help="the misconception it shows: 'believed X → Y' (with wrong)")
     sp.add_argument("--note", help="a note for --say or --regrade")
     sp.add_argument("--retract", action="append", type=int, metavar="N",
                     help="set an answer aside (misread, misclick); the item opens again")
     sp.add_argument("--why", help="why a retracted answer does not count")
     sp = add("observed", cmd_observed, "record a step of verified pairing work: "
-             "name=good|hard|again for each idea it exercised", OBSERVED_FORMAT)
-    sp.add_argument("ideas", nargs="+", metavar="NAME=GRADE")
+             "name=alone|hint|shown for each idea it carried out", OBSERVED_FORMAT)
+    sp.add_argument("ideas", nargs="+", metavar="NAME=HELP")
     sp.add_argument("--step", required=True, help="the step, e.g. '3 · causal head'")
     sp.add_argument("--note", action="append",
                     help="what was observed; 'name: …' for one idea, else for all")

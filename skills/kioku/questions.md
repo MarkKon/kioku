@@ -1,8 +1,8 @@
 # Questions
 
 The format of a block, its replies and an example are in `kioku ask -h`. This
-file is how to write items that measure the learner, and how answers are
-graded and corrected.
+file is how to write items that measure the learner, what an answer records,
+and how answers are corrected.
 
 ## Items
 
@@ -42,17 +42,18 @@ There are three kinds:
 - An idea with no entry is added by the block that asks about it: write its
   `## name · kind · area` block above the title.
 
-## Grades
+## What an answer records
 
-again (wrong or blank), hard (right with effort or a slip), good (right and
-clean), easy (right and carried to a new setting). A right pick at chance
-confidence is a guess: recorded, with no grade. A confident wrong pick is a
-**misconception**, the strongest signal there is: repair it before anything
-rests on it.
+What happened, never a grade: **right**, **partly** (right with a slip),
+**wrong** (or blank), or **never met**. A pick also records their confidence
+digit, and the memory model reads that digit against their own record at it.
+A right pick at chance confidence is a guess: recorded, not counted. A wrong
+pick at 80% or more is a **misconception**, the strongest signal there is:
+repair it before anything rests on it.
 
-Grade say items against their reference, in the same call or a later one:
-`kioku answer <q_id> --say 3=good`, with `--mis "believed X → Y"` for a
-misconception.
+Picks and write items are settled by the reply. Judge say items against their
+reference, in the same call or a later one: `kioku answer <q_id> --say
+3=right|partly|wrong`, with `--mis "believed X → Y"` for a misconception.
 
 The parser reads input from agents: a reply outside the format ("between a
 and b", a letter without a digit, two letters) is yours to settle first. Ask
@@ -79,6 +80,6 @@ An answer is set aside, never edited:
   `kioku answer <q_id> --retract 2 --why "<reason>"` moves it to `archive.md`
   and opens the item again;
 - to answer a finished item again: `--redo`;
-- to change a grade: `--regrade 2=hard`.
+- to change an outcome: `--regrade 2=partly`.
 
 The old answer is archived either way.

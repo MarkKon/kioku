@@ -95,7 +95,7 @@ about other ideas:
   R first).
 
 Judge how many from how much near the work is unsettled and how long they
-have. Record each answer as it is graded, and spend at most one line of the
+have. Record each answer as it comes in, and spend at most one line of the
 turn on recording. `kioku log` shows what this session has asked and what is
 still open; read it when your context was cut.
 

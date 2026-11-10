@@ -19,7 +19,9 @@ learner), and the general skills that use it. Keep it that way.
 - An answer updates only the idea it is about. Propagation along edges, review
   scheduling and better memory models are later, swappable work.
 - States stay few and simple, and every answer is written the moment it is
-  graded.
+  given.
+- An answer records what happened (the outcome, the confidence, the help it
+  took), never a grade. What it is worth is the memory model's business.
 - The notebook is reference the agent writes for the learner to look things up
   in. It is never evidence, and the model does not read it.
 

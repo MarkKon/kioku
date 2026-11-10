@@ -244,7 +244,7 @@ Why:
 ### 1. Evidence is an answer to a question, or verified work
 
 Evidence is an answer to a question that was asked, or a step of pairing work
-the learner typed and a test verified, graded by how much help it took.
+the learner typed and a test verified, recorded with the help it took.
 Conversation, things the agent taught, self-reports ("yes, I know Itô") and the
 learner's own notes are never evidence.
 
@@ -255,8 +255,8 @@ knowing is still tested. Confirmed "never met" matters even for ideas nobody
 goes on to teach: it tells every agent which routes are closed.
 
 Verified work passes the same tests as a question: a test with a key separates
-real understanding from pattern-matching, and the grade traces back to a
-recorded step. What it adds is volume: pairing exercises far more ideas than
+real understanding from pattern-matching, and the record traces back to a
+step. What it adds is volume: pairing exercises far more ideas than
 any block of questions could ask about, and the learner is demonstrably building
 the skill. Work that copies an explanation given in the same step is still
 teaching, not evidence.
@@ -305,7 +305,7 @@ evidence stays attached to the idea that was actually asked. Spreading it
 through the graph would be inference. Inference belongs in the memory model,
 where it can be swapped out and re-run, not baked into the evidence.
 
-### 5. Write the moment it is graded; keep states few
+### 5. Write the moment it is answered; keep states few
 
 Nothing waits in a pending area to be committed later. Each answer is stamped
 with the minute it was given, so the memory model can see time pass within a
@@ -313,8 +313,8 @@ day. An answer that turns out not to count (a misread question, a misclick, a
 broken item) is retracted: it moves to the archive with the reason, and is
 never edited or silently dropped. The first version had a
 pending step, and sessions sat uncommitted for days. Anything this basic and
-this far in the background has to be simple: an id, a question, an answer, a
-grade, a date. Each question block gets its own id, so parallel sessions never
+this far in the background has to be simple: an id, a question, an answer,
+how it went, a date. Each question block gets its own id, so parallel sessions never
 grade against the wrong block.
 
 ### 6. Review comes from the work
@@ -341,10 +341,10 @@ the memory model.
 
 ### 8. Questions are built to diagnose
 
-A question exists to separate states of knowledge, not just to collect a grade.
+A question exists to separate states of knowledge, not just to collect a mark.
 
 - **Pick items carry a confidence digit.** A right pick at chance confidence is
-  a guess and carries no grade. A confident wrong pick is a misconception, which
+  a guess and is not counted. A confident wrong pick is a misconception, which
   gets repaired before anything rests on it. Confident errors are also the ones
   people correct most readily once shown the answer (the hypercorrection effect).
 - **Each wrong option is a specific wrong model**, named with `::`, so a pick
@@ -424,6 +424,31 @@ the graph: a note is named by its idea's id, its links are the idea's edges,
 and an index note per area lists what is there. The learner's own notes stay
 their own, written by hand; the notebook is where they condense from.
 
+### 14. An answer records what happened
+
+An evidence line says what happened: the outcome (right, partly, wrong, never
+met), the learner's confidence, the help a step of work took, and whether the
+idea had been taught earlier in the session. It does not carry a grade. The
+grades again, hard, good and easy are the buttons of a flashcard program: they
+fold several observations into one word at the moment of answering, and what
+was folded cannot be taken apart later.
+
+What an answer is worth is the memory model's business (principle 12), and
+today it is this:
+
+- **Confidence is read against the learner's own record.** A digit means what
+  that learner's picks at that digit have turned out to be: someone right nine
+  times in ten at 7 has their 7 read as nearly sure. Until their record at a
+  digit is thick enough, the digit is taken at face value. A fixed threshold
+  ("8 or more is solid") fits nobody in particular.
+- **A right first answer to an idea nobody taught them is old knowledge.** It
+  starts at thirty days of stability, where a card met today would start at
+  two. Without this, material held for years looked faded within a week and
+  was asked again and again. Thirty days is a placeholder: it should be fitted
+  on the learner's own later answers once there are enough.
+- **A slip, or help beyond the brief, counts for less** than a clean answer,
+  and being handed the answer counts as a miss.
+
 ## Ideas it draws on
 
 The first group is where the idea came from. The rest are related work found
@@ -474,13 +499,14 @@ log below.
 - **Stop and teach, or note it and go on?** When a check finds a gap in the
   middle of a task, the agent can teach it now or flag it and carry on. Neither
   is right for every task.
-- **Knowledge that predates the record.** One right answer gives an FSRS
-  stability of about 2.3 days, so material held for years looks faded within a
-  week, and agents ask about it again too often. The memory model needs a prior
-  for old knowledge that is being recorded for the first time.
+- **Knowledge that predates the record.** A right first answer to an idea
+  nobody taught now starts at thirty days of stability (principle 14). The
+  number is a placeholder: a learner's first ten days gave twelve later-day
+  answers after a right one, eleven of them right, which cannot tell thirty
+  days from a hundred.
 - **Fresh answers say little.** R now falls within the day (FSRS-6 on elapsed
-  time), but only slightly: a first answer graded good still reads about 0.98
-  eight hours later. Whether early learning needs a separate short-term memory
+  time), but only slightly: a clean first answer still reads about 0.98 eight
+  hours later. Whether early learning needs a separate short-term memory
   model, one in which an idea met this morning can be gone by the evening, is
   open.
 - **What the graph should do to R.** Principle 12 records needs, uses, areas
@@ -502,9 +528,9 @@ log below.
 - **Competent use outside pairing.** Test-verified pairing work counts
   (principle 1). Correct code written elsewhere, with no test and no recorded
   step, still does not; whether it should is open.
-- **Observed work's grade.** good/hard/again by the help a step took is a first
-  calibration; the memory model may need to weigh it differently from an
-  answer.
+- **What observed work is worth.** Work done alone counts as a clean answer,
+  with a hint as a slip, shown the answer as a miss. That is a first guess;
+  the memory model may need to weigh work differently from an answer.
 - **Question fatigue.** How many questions per session the learner will put up
   with, and where "non-trivial" begins, can only be learned from use.
 
@@ -631,3 +657,12 @@ Newest last. Add an entry whenever a principle is added, changed or dropped.
   an area's coverage. `kioku ask` adds the ideas written above its block, so
   asking about an unrecorded idea is one call. `kioku log` and `kioku context
   --near` give an agent what a session asked and what lies around an idea.
+- **2026-11-10.** Principle 14: an answer records what happened (right,
+  partly, wrong, never met; confidence; help), and the grades again, hard,
+  good and easy are gone from the evidence, the commands and the skills. The
+  memory model reads a pick's confidence against the learner's own record at
+  that digit, and starts a right first answer to an untaught idea at thirty
+  days of stability. Tried on a model of 286 answers: every old line reads as
+  the same answer, and of 131 ideas last answered right, those with R under
+  0.9 went from 106 to 20. Old lines are still read, and `kioku upkeep`
+  rewrites them.

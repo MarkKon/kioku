@@ -765,8 +765,8 @@ body.onclick = e => { const id = e.target.dataset?.id; if (id) open(id, true); }
 function answers(list) {
   if (!list.length) return `<p style="color:var(--muted)">No answers yet.</p>`;
   return `<ul>${list.slice().reverse().map(a =>
-    `<li><span class="grade">${a.at} ${esc(a.grade)}${a.conf != null ? " · " + a.conf : ""}</span>
-     ${a.flag === "mis" ? '<span class="mis">misconception</span>' : a.flag === "unseen" ? "never met" : a.flag === "pre" ? "before teaching" : ""}
+    `<li><span class="grade">${a.at} ${esc(a.outcome === "unmet" ? "never met" : a.outcome)}${a.help ? " · " + esc(a.help) : ""}${a.conf != null ? " · " + a.conf : ""}</span>
+     ${a.flag === "mis" ? '<span class="mis">misconception</span>' : a.flag === "pre" ? "before teaching" : a.taught ? "after teaching" : ""}
      <span class="id">${esc(a.kind)}${a.depth ? " · " + esc(a.depth) : ""} ${esc(a.ask)}</span><br>${esc(a.note)}</li>`).join("")}</ul>`;
 }
 function stats(x) {
@@ -874,7 +874,7 @@ function renderStats() {
     for (const a of all) count.get(+start(a.t))?.push(a);
     const day = d => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
     aChart = columns([{ cols: shown.map(d => { const as = count.get(+d);
-        const by = ["again", "hard", "good", "easy", "guess"].map(g => [g, as.filter(a => a.grade === g).length]).filter(([, k]) => k);
+        const by = ["right", "partly", "wrong", "unmet", "guess"].map(g => [g, as.filter(a => a.outcome === g).length]).filter(([, k]) => k);
         return { value: as.length, colour: T["ink-2"],
           tip: `${per === "week" ? "Week of " : ""}${day(d)}<br><b>${as.length}</b> answers${by.length ? "<br>" + by.map(([g, k]) => `${g} ${k}`).join(" · ") : ""}` }; }),
       labels: shown.length > 1 ? [day(shown[0]), per === "week" ? "this week" : "today"] : [day(shown[0])] }]);
