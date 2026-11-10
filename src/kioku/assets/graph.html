@@ -184,7 +184,7 @@
   <span class="dot" style="border:2px solid var(--ink)" data-if="focus"></span><span data-if="focus">looked up</span>
   <svg width="22" height="10"><line x1="1" y1="5" x2="15" y2="5" stroke="var(--muted)" stroke-width="1.5"/><path d="M14 1 L21 5 L14 9 Z" fill="var(--muted)"/></svg><span title="the arrow points to the idea that cannot be followed without it">needs</span>
   <svg width="22" height="10"><line x1="1" y1="5" x2="15" y2="5" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M14 1 L21 5 L14 9 Z" fill="var(--muted)"/></svg><span title="the idea it points to carries it out">uses only</span>
-  <span class="dot" style="border-radius:2px;background:var(--hair)" data-if="areas"></span><span data-if="areas" title="an area, with its subareas inside it">area</span>
+  <span class="dot" style="border-radius:2px;background:var(--hair)" data-if="areas"></span><span data-if="areas" title="an area, split into faces for its subareas; areas never overlap">area</span>
 </div>
 <button class="keybtn" id="showkey" hidden>Key</button>
 
@@ -278,15 +278,27 @@ const degree = id => (nbrs[id]?.size ?? 0);
 const markOf = l => l.needs && l.uses ? "needs and uses" : l.needs ? "needs" : "uses";
 const asked = n => n.answers.some(a => a.flag !== "pre");
 
-// -- areas: every area, and each area above it, is a shaded region behind its
-// ideas; nested areas stack, so a subarea reads darker inside its parent
+// -- areas are a map. Each top area is one blob (the rounded outline of its
+// ideas), and its subareas split it into faces with nothing left over, as do
+// theirs in turn. Where two pieces of ground meet is decided by a power
+// diagram of their ideas' centres, weighted by size so a big area is not cut by
+// a small neighbour; ideas sitting directly in an area with subareas get a face
+// of their own. A force keeps every idea on its face and each area compact.
 const chain = a => a.split("/").map((_, i, p) => p.slice(0, i + 1).join("/"));
 const inArea = (n, a) => n.area === a || n.area.startsWith(a + "/");
 const AREAS = [...new Set(DATA.nodes.flatMap(n => chain(n.area)))]
   .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b));
 const TOPS = [...new Set(AREAS.map(a => a.split("/")[0]))];
+// a subarea's hue sits near its parent's, its siblings spread either side
+const HUE = {};
+for (const a of AREAS) {
+  const p = a.split("/"), up = p.slice(0, -1).join("/");
+  if (p.length === 1) { HUE[a] = 25 + 360 * TOPS.indexOf(a) / TOPS.length; continue; }
+  const sibs = AREAS.filter(b => b.startsWith(up + "/") && b.split("/").length === p.length), i = sibs.indexOf(a);
+  HUE[a] = HUE[up] + (sibs.length > 1 ? (i / (sibs.length - 1) - .5) * 44 / (p.length - 1) : 0);
+}
 function areaColour(a, alpha, ink) {
-  const h = (25 + 360 * TOPS.indexOf(a.split("/")[0]) / TOPS.length) * Math.PI / 180;
+  const h = (HUE[a] ?? HUE[a.split("/")[0]]) * Math.PI / 180;
   const [L, C] = ink ? (T.mode === "dark" ? [.78, .09] : [.48, .1]) : (T.mode === "dark" ? [.62, .08] : [.7, .1]);
   return hexA(hex([L, C * Math.cos(h), C * Math.sin(h)]), alpha);
 }
@@ -298,34 +310,125 @@ function hull(pts) {  // monotone chain
   for (const p of pts.reverse()) { while (up.length > 1 && x(up.at(-2), up.at(-1), p) <= 0) up.pop(); up.push(p); }
   return lo.slice(0, -1).concat(up.slice(0, -1));
 }
+function smooth(poly) {  // Chaikin, twice: every corner cut, so the hull reads as a blob
+  for (let t = 0; t < 2; t++) poly = poly.flatMap((p, i) => { const q = poly[(i + 1) % poly.length];
+    return [[.75 * p[0] + .25 * q[0], .75 * p[1] + .25 * q[1]], [.25 * p[0] + .75 * q[0], .25 * p[1] + .75 * q[1]]]; });
+  return poly;
+}
 const RING = Array.from({ length: 12 }, (_, i) => [Math.cos(i * Math.PI / 6), Math.sin(i * Math.PI / 6)]);
+const LEVELS = Math.max(1, ...AREAS.map(a => a.split("/").length));
+// an idea's group at level k: its area there, or "area/" for an idea sitting
+// directly in an area with subareas
+const keyAt = (area, k) => { const p = area.split("/");
+  return k < p.length ? p.slice(0, k + 1).join("/") : area + "/"; };
+function sites(ns) {
+  return Array.from({ length: LEVELS }, (_, k) => {
+    const m = new Map();
+    for (const n of ns) { const key = keyAt(n.area, k);
+      const g = m.get(key) ?? m.set(key, { key, parent: k ? keyAt(n.area, k - 1) : "", x: 0, y: 0, n: 0 }).get(key);
+      g.x += n.x; g.y += n.y; g.n++; }
+    for (const g of m.values()) { g.x /= g.n; g.y /= g.n; g.w = 520 * g.n * S.spacing ** 2; }
+    return m;
+  });
+}
+// the half-planes [ux, uy, c, sibling, k] that hold group `key` at level k:
+// p·u <= c. The weight gap is capped so a group's centre stays on its ground.
+function fronts(at, k, key) {
+  const a = at[k].get(key), out = [];
+  if (!a) return out;
+  for (const b of at[k].values()) {
+    if (b === a || b.parent !== a.parent) continue;
+    const ux = b.x - a.x, uy = b.y - a.y, d2 = ux * ux + uy * uy;
+    if (!d2) continue;
+    const dw = Math.max(-.8 * d2, Math.min(.8 * d2, a.w - b.w));
+    out.push([ux, uy, (b.x * b.x + b.y * b.y - a.x * a.x - a.y * a.y + dw) / 2, b.key, k]);
+  }
+  return out;
+}
+// cut a polygon of [x, y, label] to the half-planes; a vertex's label names
+// the front that the edge to the next vertex lies on (null: the blob's rim)
+function clip(poly, hs) {
+  for (const [ux, uy, c, key, k] of hs) {
+    const side = p => p[0] * ux + p[1] * uy - c, out = [];
+    poly.forEach((p, i) => {
+      const q = poly[(i + 1) % poly.length], sp = side(p), sq = side(q);
+      const cut = () => { const t = sp / (sp - sq); return [p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]; };
+      if (sp <= 0) { out.push(p); if (sq > 0) out.push([...cut(), [key, k]]); }
+      else if (sq <= 0) out.push([...cut(), p[2]]);
+    });
+    poly = out;
+    if (poly.length < 3) return [];
+  }
+  return poly;
+}
 function shadeAreas(ctx, scale) {
   if (!S.areas) return;
   const ns = G.graphData().nodes.filter(n => n.x != null);
-  for (const a of AREAS) {
-    const inside = ns.filter(n => inArea(n, a));
-    if (!inside.length) continue;
-    const level = a.split("/").length - 1, pad = Math.max(8, 24 - 6 * level) * Math.sqrt(S.spacing);
-    const h = hull(inside.flatMap(n => RING.map(([c, s]) => [n.x + pad * c, n.y + pad * s])));
-    ctx.beginPath();  // round the corners through the edge midpoints
-    const mid = i => { const p = h[i % h.length], q = h[(i + 1) % h.length];
-      return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; };
-    ctx.moveTo(...mid(h.length - 1));
-    h.forEach((p, i) => ctx.quadraticCurveTo(p[0], p[1], ...mid(i)));
-    ctx.closePath();
-    ctx.fillStyle = areaColour(a, T.mode === "dark" ? .11 : .10);
+  if (!ns.length) return;
+  const at = sites(ns), pad = 26 * Math.sqrt(S.spacing), dark = T.mode === "dark";
+  const trace = poly => { ctx.moveTo(poly[0][0], poly[0][1]);
+    for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0], poly[i][1]); ctx.closePath(); };
+  const face = new Map(), shown = [];
+  at.forEach((groups, k) => { for (const g of groups.values()) {
+    let poly = k ? face.get(k - 1 + "|" + g.parent) ?? [] : smooth(hull(ns.filter(n => keyAt(n.area, 0) === g.key)
+      .flatMap(n => RING.map(([c, s]) => [n.x + pad * c, n.y + pad * s])))).map(([x, y]) => [x, y, null]);
+    poly = poly.length ? clip(poly, fronts(at, k, g.key)) : [];
+    face.set(k + "|" + g.key, poly);
+    if (!poly.length || g.key.endsWith("/")) continue;
+    ctx.beginPath(); trace(poly);
+    ctx.fillStyle = areaColour(g.key, k ? (dark ? .1 : .09) : (dark ? .12 : .11));
     ctx.fill();
-    // the name sits on the region's top edge; subareas' names fade in with zoom
-    const a2 = level === 0 ? 0.9 : Math.max(0, Math.min(0.9, (scale - 0.7) / 0.6));
-    if (a2 > 0) {
-      const top = h.reduce((m, p) => p[1] < m[1] ? p : m);
-      const xs = h.filter(p => p[1] < top[1] + 4 / scale).map(p => p[0]);
-      ctx.font = `${level === 0 ? 600 : 500} ${(level === 0 ? 13 : 11) / scale}px ui-sans-serif, system-ui, sans-serif`;
-      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-      ctx.fillStyle = areaColour(a, a2, true);
-      ctx.fillText(level === 0 ? a : a.split("/").at(-1),
-                   (Math.min(...xs) + Math.max(...xs)) / 2, top[1] - 2 / scale);
+    shown.push([g.key, k, poly]);
+  } });
+  const line = (style, w, dash) => { ctx.strokeStyle = style; ctx.lineWidth = w / scale;
+    ctx.setLineDash(dash ? dash.map(d => d / scale) : []); ctx.stroke(); };
+  const edges = (poly, keep) => poly.forEach((p, i) => { if (keep(p[2])) {
+    const q = poly[(i + 1) % poly.length]; ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); } });
+  // inside an area: the borders between its faces, lighter a level down
+  for (let k = LEVELS - 1; k >= 1; k--) for (const [a, poly] of face) {
+    const [lk, key] = [+a.slice(0, a.indexOf("|")), a.slice(a.indexOf("|") + 1)];
+    if (lk !== k) continue;
+    ctx.beginPath();
+    edges(poly, l => l && l[1] === k && key < l[0]);
+    line(areaColour(key.split("/")[0], k === 1 ? .55 : .4, true), k === 1 ? 1 : .7, k === 1 ? null : [4, 3]);
+  }
+  // each top area's rim in its own ink, and a firm line where two meet
+  for (const [a, k, poly] of shown) if (!k) { ctx.beginPath(); edges(poly, l => !l || l[1] === 0); line(areaColour(a, .5, true), 1.2); }
+  ctx.beginPath();
+  const spans = (a, b, px, py) => {  // a's edges on its front with b, as merged [t0, t1]
+    const poly = face.get("0|" + a) ?? [], out = [];
+    poly.forEach((p, i) => { if (!p[2] || p[2][0] !== b || p[2][1] !== 0) return;
+      const q = poly[(i + 1) % poly.length], s = p[0] * px + p[1] * py, t = q[0] * px + q[1] * py;
+      out.push([Math.min(s, t), Math.max(s, t)]); });
+    out.sort((u, v) => u[0] - v[0]);
+    return out.reduce((m, iv) => (m.length && iv[0] <= m.at(-1)[1] ? (m.at(-1)[1] = Math.max(m.at(-1)[1], iv[1])) : m.push([...iv]), m), []);
+  };
+  for (const a of at[0].values()) for (const [ux, uy, c, b] of fronts(at, 0, a.key)) {
+    if (b < a.key) continue;
+    const len = Math.hypot(ux, uy), nx = ux / len, ny = uy / len, px = -ny, py = nx, o = c / len;
+    for (const [a0, a1] of spans(a.key, b, px, py)) for (const [b0, b1] of spans(b, a.key, px, py)) {
+      const t0 = Math.max(a0, b0), t1 = Math.min(a1, b1);
+      if (t1 > t0) { ctx.moveTo(nx * o + px * t0, ny * o + py * t0); ctx.lineTo(nx * o + px * t1, ny * o + py * t1); }
     }
+  }
+  line(`rgba(${T.link},${dark ? .6 : .55})`, 1.4);
+  ctx.setLineDash([]);
+  // names: a top area's above its blob, a subarea's inside the top of its
+  // face, fading in with zoom; a name that would sit on one already drawn is left out
+  const drawn = [];
+  for (const [a, k, poly] of shown) {
+    const a2 = k === 0 ? 0.9 : Math.max(0, Math.min(0.9, (scale - 0.2 - .3 * k) / 0.4));
+    if (a2 <= 0) continue;
+    const top = poly.reduce((m, p) => p[1] < m[1] ? p : m);
+    const xs = poly.filter(p => p[1] < top[1] + 12 / scale).map(p => p[0]);
+    ctx.font = `${k < 2 ? 600 : 500} ${(k === 0 ? 13 : k === 1 ? 11 : 10) / scale}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = k ? "top" : "bottom";
+    const text = k === 0 ? a : a.split("/").at(-1), x = (Math.min(...xs) + Math.max(...xs)) / 2,
+          y = k ? top[1] + 4 / scale : top[1] - 2 / scale, w = ctx.measureText(text).width / 2, h = 14 / scale;
+    if (drawn.some(([u, v, z]) => Math.abs(u - x) < w + z && Math.abs(v - y) < h)) continue;
+    drawn.push([x, y, w]);
+    ctx.fillStyle = areaColour(a, a2, true);
+    ctx.fillText(text, x, y);
   }
 }
 
@@ -480,6 +583,24 @@ G.d3Force("areas", alpha => {
       const [x, y, k] = mid[a], w = (0.04 + 0.02 * i) * alpha;
       n.vx += (x / k - n.x) * w; n.vy += (y / k - n.y) * w * 0.4;
     });
+  }
+});
+// every idea stays on its face, a margin in from each border: a step that
+// would cross one is cut short; and each area stays compact
+G.d3Force("fronts", alpha => {
+  const ns = G.graphData().nodes.filter(n => n.x != null), at = sites(ns), m = 14 * sp(), memo = new Map();
+  // an idea far out from its area's (or subarea's) centre is drawn back in
+  for (const n of ns) for (let k = 0; k < Math.min(2, LEVELS); k++) {
+    const g = at[k].get(keyAt(n.area, k)), r = 1.15 * Math.sqrt(g.w), dx = g.x - n.x, dy = g.y - n.y, d = Math.hypot(dx, dy);
+    if (d > r) { const f = (1 - r / d) * .15 * alpha; n.vx += dx * f; n.vy += dy * f; }
+  }
+  for (const n of ns) for (let k = 0; k < LEVELS; k++) {
+    const key = k + "|" + keyAt(n.area, k);
+    const hs = memo.get(key) ?? memo.set(key, fronts(at, k, keyAt(n.area, k))).get(key);
+    for (const [ux, uy, c] of hs) {
+      const len = Math.hypot(ux, uy), over = ((n.x + n.vx) * ux + (n.y + n.vy) * uy - c) / len + m;
+      if (over > 0) { n.vx -= over * ux / len; n.vy -= over * uy / len; }
+    }
   }
 });
 G.d3Force("layers", alpha => {

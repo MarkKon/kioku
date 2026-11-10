@@ -77,8 +77,10 @@ meanwhile show up. `--out page.html` writes a static page instead.
 
 Nodes are coloured by R (grey: never asked) and never overlap. An edge is solid
 when it needs and dashed when it only uses, and its arrow points to the idea
-that rests on it, which sits below. Each area is a shaded region, with its
-subareas shaded inside it. Hovering lights an idea's edges, with particles
+that rests on it, which sits below. The areas read like a map: each top
+area is one blob, split into a face for each subarea (and those into theirs,
+with dashed borders), its ideas kept inside it. Areas never overlap, and where
+two meet a straight border runs between them. Hovering lights an idea's edges, with particles
 flowing toward what rests on it; clicking a node shows its statement and every
 answer. Search matches names, statements and aliases; `area:maths/analysis`
 lights an area.
