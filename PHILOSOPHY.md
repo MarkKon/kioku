@@ -248,6 +248,12 @@ the learner typed and a test verified, graded by how much help it took.
 Conversation, things the agent taught, self-reports ("yes, I know Itô") and the
 learner's own notes are never evidence.
 
+One self-report is taken at its word: "never met it", said to a question or to
+a name in a triage (a list of names the learner marks). A claim of not knowing
+is rarely wrong, and when it is, the next question corrects it. A claim of
+knowing is still tested. Confirmed "never met" matters even for ideas nobody
+goes on to teach: it tells every agent which routes are closed.
+
 Verified work passes the same tests as a question: a test with a key separates
 real understanding from pattern-matching, and the grade traces back to a
 recorded step. What it adds is volume: pairing exercises far more ideas than
@@ -350,12 +356,15 @@ A question exists to separate states of knowledge, not just to collect a grade.
 - **The answer format fits the learner**, as described in `profile.md`: a letter
   and a digit when they don't want to type, a formula written on paper or a
   tablet, a dictated line for a why.
-- **A question block is short, hardest item first.** A confident right answer
-  at the top shows where the learner stands. It records nothing about the ideas
-  below it (principle 4), so an idea a task leans on still gets its own answer.
-- **Each item stands alone.** Every term is defined in it or earlier, every
-  wrong option is false outright, and the agent solves the item before asking.
-  A badly built item measures the agent, not the learner.
+- **A question block is as long as the moment needs.** A right answer records
+  nothing about the ideas below it (principle 4), so an idea a task leans on
+  still gets its own answer. While teaching, the questions on the step come
+  first and questions that keep the model up to date follow: probes on what
+  comes next, a triage, an idea from nearby whose R has dropped.
+- **Each item stands alone.** Every term is defined in it or earlier, it can
+  be answered without the other items, every wrong option is false outright,
+  and the agent solves the item before asking. A badly built item measures the
+  agent, not the learner.
 
 ### 9. A question costs a moment; a wrong pitch costs the conversation
 
@@ -420,7 +429,12 @@ makes.
 | Hypercorrection | Butterfield & Metcalfe (2001) | a confident miss is flagged and repaired first |
 | Diagnostic distractors | Hestenes, Wells & Swackhamer, Force Concept Inventory (1992) | each wrong option names a wrong model |
 | Illusion of explanatory depth | Rozenblit & Keil (2002) | why self-report is not evidence |
-| Desirable difficulties, productive failure | Bjork (1994); Kapur (2008) | the predict step in lessons; the open question of how much struggle to leave |
+| Desirable difficulties, productive failure | Bjork (1994); Kapur (2008) | an idea one step away is tried before it is explained; the open question of how much struggle to leave |
+| Worked examples and fading; expertise reversal | Renkl & Atkinson (2003); Kalyuga et al. (2003) | an idea further away gets a solved case, then one with the key step left out; how much is read from R |
+| Contrasting cases | Schwartz & Bransford, "A time for telling" (1998) | the explanation follows the learner's attempt on cases that differ in one feature |
+| Generation effect, self-explanation | Slamecka & Graf (1978); Chi et al. (1994) | every teaching turn ends with the learner producing something, and saying why |
+| Elaborated feedback, refutation | Shute (2008); Kendeou & O'Brien (2014) | feedback says why; a repair names the belief and shows where it fails |
+| Interleaving | Rohrer & Taylor (2007) | a turn's questions include an idea from nearby whose R has dropped |
 | Memory woven into reading | Matuschak & Nielsen, [Quantum Country](https://quantum.country) and "How can we develop transformative tools for thought?" (2019) | the check sits inside the work, not in a separate review app |
 | Graph view | Obsidian | `kioku graph` |
 
@@ -433,8 +447,9 @@ log below.
 - **Goldilocks is more than level.** Knowing what the learner holds says what to
   explain. It doesn't say how much to leave for them to work out themselves,
   which is where much of the learning happens (desirable difficulties). The
-  learn skill's predict step is one answer, but there is no general rule yet.
-  Getting this right matters a lot and is hard.
+  teaching turn's rule is one answer: an idea one reasoning step away is tried
+  before it is explained, one further away gets a worked example. Whether that
+  line is in the right place is for use to show.
 - **Asking changes what it measures.** By the testing effect, every check is
   also practice. That fits the loop, since FSRS assumes reviews strengthen
   memory, but it means R partly reflects how often the agents happened to ask.
@@ -570,3 +585,17 @@ Newest last. Add an entry whenever a principle is added, changed or dropped.
   that sorted route ideas into states was dropped for going against principle
   3. An item can be asked before its idea is taught (`pre`): the answer is
   kept as data and skipped by the memory model.
+- **2026-11-10.** The teaching turn (`skills/kioku/turn.md`, drafted in
+  `docs/teaching-turn.md`). One step is one turn and one reply; only the
+  repair of a confident error spends a second turn. A turn's jobs are named by
+  the terms of the literature (feedback, anchor, material, generation,
+  assessment), so the skills lead with words an agent already knows. This
+  replaces the lesson's sweep of 2026-11-03: its reason stands (nothing rests
+  on an unasked idea), but the asking now rides in every turn's questions
+  instead of a round before the teaching, because rounds of questions and
+  separate lesson, check and brief turns made sessions long. Learn and pair
+  share the turn; in pairing the learner's production is code, a passing test
+  is evidence for the method, and why it works gets its own question. A
+  question block has no fixed size. "Never met it" can be said to a list of
+  names (a triage, recorded with `kioku unmet`): a claim of not knowing is
+  taken at its word, a claim of knowing is still tested.

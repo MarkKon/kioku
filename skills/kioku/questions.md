@@ -24,7 +24,9 @@ There are three kinds:
   idea.
 - Each item stands alone: every term in it is defined in the item or was
   defined earlier in the conversation, in their notation, unless recalling
-  that definition is what the item tests.
+  that definition is what the item tests. It states the situation and the
+  numbers it asks about, and can be answered without the answer to another
+  item in the block.
 - Options are bare claims of the same length and register. Write the right one
   first, then turn it into each wrong one: the answer someone holding a
   specific wrong model would give, named after `::`. Every wrong option is
@@ -55,6 +57,14 @@ and pass that on.
 A reply that asks a question instead of answering an item is not an answer:
 answer their question, pass on only the items they did answer, and ask the open
 item again, or a fresh one, once the question is settled.
+
+## Triage
+
+A triage is a lettered list of idea names under a block, with "which of these
+have you never met?". The learner adds the letters to their reply. Add the
+marked ideas that have no entry, then record them in one call: `kioku unmet
+<name> …`. An idea that already has answers gets a question instead. Pass
+only the numbered part of their reply to `kioku answer`.
 
 ## Answers that should not count
 

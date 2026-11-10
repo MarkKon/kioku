@@ -1,0 +1,105 @@
+# The teaching turn: why, and what is left
+
+Written 2026-11-10 and put into the skills the same day. The turn itself (its
+rules, its jobs, how it adapts, example turns) is in `skills/kioku/turn.md`,
+and nowhere else. This page keeps the reasons and the parts not built yet.
+
+## What was wrong
+
+- **Sessions took too many messages.** In pairing, a step ran as a lesson, a
+  check, a verdict and then the brief. In a lesson, a round of questions came
+  before any teaching.
+- **Agents assumed.** Much of the model has no answers, and agents built on
+  ideas nobody had asked about, in spite of the rule to check.
+- **Teaching methods did not land.** The skills paraphrased them ("at the size
+  of what they hold"). A paraphrase brings none of what an agent already knows
+  about a worked example or about hypercorrection.
+
+## What was decided
+
+- **One step is one turn and one reply.** Only the repair of a confident
+  error spends a second turn. Verdicts, questions about other ideas and the
+  plan ride inside a step's turn.
+- **Assessment is a job of every turn.** Each turn's questions also probe what
+  the next step builds on, triage names, and bring back a nearby idea whose R
+  has dropped. This replaces the lesson's sweep; its reason stands (nothing
+  rests on an unasked idea).
+- **An idea one reasoning step away is tried before it is explained**; one
+  further away gets a worked example. The explanation of a tried idea is the
+  feedback of the next turn.
+- **The jobs are named by the terms of the literature**, listed below.
+- **A turn is not a format.** It has four fixed rules and is otherwise
+  judgement; the skill carries example turns of different shapes.
+- **A term is defined properly or not at all**, a question states what it
+  asks about, and a turn carries no commentary on what the agent is doing.
+- **Learn and pair share the turn.** In pairing the learner's production is
+  code. A passing test is evidence for the method and the API pieces it
+  carried out; why the method works gets a question in the next turn.
+
+## Outside maths and code
+
+The jobs stay; the forms change. In a language, contrasting cases are two
+sentences that differ in one ending, and the learner produces a sentence of
+their own. In history, the case is a source, and the learner says what it does
+and does not show. For a lab method, the learner carries out the procedure,
+and a result that can be checked is its key.
+
+The four kinds of idea cover this when read as four questions: what it means
+(definition), that it holds (result), why it holds (proof), how to do it
+(method).
+
+## The leading terms
+
+| Term | In one line | Source |
+| --- | --- | --- |
+| Elaborated feedback | Feedback that says why, not only whether | Shute, "Focus on formative feedback" (2008) |
+| Hypercorrection | Confident errors are corrected most readily | Butterfield & Metcalfe (2001) |
+| Refutation | Name the belief, show where it fails, then correct | Kendeou & O'Brien (2014) |
+| Prior knowledge | New material attaches to what is held | Ausubel (1968) |
+| Zone of proximal development | What they can do with help, not yet alone | Vygotsky (1978) |
+| Knowledge frontier | Ideas whose needs are all held | Doignon & Falmagne (1985) |
+| Mastery learning | A step is done when it is shown, not when it is explained | Bloom (1968) |
+| Productive failure | Trying before being told | Kapur (2008) |
+| Worked example, fading | A solved case, then one with the key step left out | Renkl & Atkinson (2003) |
+| Expertise reversal | Help for novices slows the experienced | Kalyuga et al. (2003) |
+| Contrasting cases | Two cases that differ in what matters | Schwartz & Bransford (1998) |
+| Concreteness fading | Concrete first, then general, then notation | Goldstone & Son (2005) |
+| Generation effect | Produced is kept better than read | Slamecka & Graf (1978) |
+| Testing effect | Retrieval strengthens more than re-reading | Roediger & Karpicke (2006) |
+| Self-explanation | Saying why a step holds | Chi et al. (1994) |
+| Interleaving | Mixed topics, harder and longer-lasting retrieval | Rohrer & Taylor (2007) |
+
+## Not built yet
+
+Built with the turn: `kioku unmet`, which records the names marked never met
+in a triage, and a question block without a size limit.
+
+Still to build, smallest first:
+
+- `kioku log --since 3h`: what was asked and answered in this session, so an
+  agent can pick a lesson up after its context was cut.
+- `kioku context <idea> --near`: the ideas a few edges away and in
+  neighbouring areas, with R, for interleaving. Until then, `kioku context
+  <area>`.
+- "Never met" shown apart from a wrong answer. Both read R .00 today.
+- `kioku ask` accepting new ideas in the same call as the questions about
+  them. Today an unrecorded idea needs `kioku add` first, which is when agents
+  skip the question.
+- A mark for answers given after teaching in the same session, so the memory
+  model can tell what was learned today from what was held before. It replaces
+  `pre`, which `learn` no longer uses.
+- Answers that record what happened in place of the grades again, hard, good
+  and easy: the outcome (right, partly, wrong, never met), the confidence
+  digit read against the learner's own record, the help given, and what
+  verified it (a key, the learner, the agent, a test).
+- The notebook: a folder of notes the agent writes, one per idea, when a
+  step's answers are right, with an index per area and per lesson. The learner
+  may have it open while answering, so questions ask what cannot be read off
+  a note, and R comes to mean "can use it with the notebook open".
+
+## Not decided
+
+- **How this works with a weaker agent.** The turn asks for judgement, and a
+  weaker model may copy one example's shape every time. The plan is to try the
+  skill with a small model as the learner on an invented subject, where it
+  knows only what the lesson tells it.

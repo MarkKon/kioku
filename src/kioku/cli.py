@@ -2,8 +2,8 @@
 
 The loop: look ideas up (`context`), ask what the lookup does not settle
 (`ask`), and pass the reply on (`answer`), which records it at once. Evidence
-comes only from questions asked and answered, and from verified work
-(`observed`). A memory model turns each idea's answers into R, the chance
+comes only from questions asked and answered, from verified work
+(`observed`), and from names the learner marks as never met (`unmet`). A memory model turns each idea's answers into R, the chance
 they recall it now.
 
 This module parses arguments and prints; the work lives in the modules below.
@@ -628,6 +628,33 @@ def cmd_observed(ctx: Context, a):
           + ", ".join(f"{m.name(j)} {g}" for j, g in pairs))
 
 
+def cmd_unmet(ctx: Context, a):
+    m = ctx.model
+    ids = []
+    for name in (t.strip() for arg in a.ideas for t in arg.split(",") if t.strip()):
+        j = m.resolve(name)
+        if j is None:
+            die(f"no idea `{name}` (add it with `kioku add`, then record it)")
+        ids.append(j)
+    ids = list(dict.fromkeys(ids))
+    asked = [m.name(j) for j in ids if any(x.flag != "pre" for x in m.answers_for(j))]
+    if asked:
+        die(f"{', '.join(asked)} already has answers; ask a question about it instead")
+    qid = new_id("q_", ctx.store.ask_ids())
+    what = " ".join((a.note or "").split())
+    items = [{"n": k, "kind": "triage", "id": j, "name": m.ideas[j].name, "depth": None,
+              "q": "never met?", "options": [], "why": "", "ref": "", "state": "done"}
+             for k, j in enumerate(ids, 1)]
+    ctx.store.save_ask({"id": qid, "title": "triage" + (f" · {what}" if what else ""),
+                        "asked": ctx.cfg.now.isoformat(timespec="seconds"), "triage": True,
+                        "items": items})
+    for k, j in enumerate(ids, 1):
+        ctx.store.record(Answer(ctx.cfg.now, j, "triage", "again", qid, k, flag="unseen",
+                                note="never met it (triage)"))
+    print(f"{len(ids)} idea(s) recorded as never met under {qid}: "
+          + ", ".join(m.name(j) for j in ids))
+
+
 # -- commands: upkeep
 
 def cmd_upkeep(ctx: Context, a):
@@ -659,7 +686,7 @@ A block, on stdin or in a file:
 <idea> is a name, alias or id. The depth is what the item demands: state (recall
 it), use (apply it when named, the default), transfer (reach for it where nothing
 points to it). pre: asked before the idea is taught; the answer is kept but is
-not evidence of memory. At most six items.
+not evidence of memory.
 
 Replies, all items on one line, e.g. `1b8 2. 3: the variance shrinks`:
   pick   a letter and a confidence digit: `1b8` (option b, 80% sure)
@@ -717,6 +744,18 @@ An idea taught within the same step gets no grade.
 Example:
   kioku observed register-buffer=hard tensor-broadcasting=good \\
     --step "3 · causal head" --note "register-buffer: needed the device demo"
+"""
+
+
+UNMET_FORMAT = """\
+Triage: show the learner a lettered list of idea names in your reply and ask
+which they have never met. Record the ones they mark, in one call:
+
+  kioku unmet specificity likelihood-ratio odds --note "opening of the lesson"
+
+A claim of never having met an idea is recorded. A name left unmarked is not
+evidence of anything: it still gets a real question before work rests on it.
+Each idea must exist (`kioku add`) and have no answers yet.
 """
 
 
@@ -788,6 +827,11 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--step", required=True, help="the step, e.g. '3 · causal head'")
     sp.add_argument("--note", action="append",
                     help="what was observed; 'name: …' for one idea, else for all")
+
+    sp = add("unmet", cmd_unmet, "record the ideas the learner marked as never met in a "
+             "triage", UNMET_FORMAT)
+    sp.add_argument("ideas", nargs="+", metavar="NAME")
+    sp.add_argument("--note", help="what the triage was for")
 
     sp = add("upkeep", cmd_upkeep, "daily: check, back up, duplicates, areas to split, "
              "calibration, vault notes without ideas")

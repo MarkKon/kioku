@@ -7,7 +7,8 @@ from dataclasses import dataclass
 
 IDEA_KINDS = ("definition", "result", "proof", "method")
 ASK_KINDS = ("pick", "write", "say")  # the item kinds of a question block
-ANSWER_KINDS = (*ASK_KINDS, "observed")  # observed: a step of verified work
+ANSWER_KINDS = (*ASK_KINDS, "observed", "triage")  # observed: a step of verified work;
+# triage: a name the learner marked as never met
 GRADES = ("again", "hard", "good", "easy")  # `guess` is recorded but carries no grade
 DEPTHS = ("state", "use", "transfer")
 
@@ -34,11 +35,12 @@ class Idea:
 
 @dataclass(frozen=True)
 class Answer:
-    """One answered question item, or one observed step: the only evidence."""
+    """One answered question item, one observed step, or one name marked never met in a
+    triage: the only evidence."""
 
     at: dt.datetime  # when it was answered (a line with only a date reads as noon)
     id: str  # the idea it is about
-    kind: str  # pick, write, say or observed
+    kind: str  # pick, write, say, observed or triage
     grade: str  # again, hard, good, easy, or guess
     ask: str  # the question block (or observed record), q_…
     n: int  # the item's number in its block

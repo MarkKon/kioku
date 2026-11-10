@@ -93,8 +93,14 @@ A step the learner did in pairing that a test verified, graded by the help it
 took.
 _Avoid_: demo, usage
 
+**Triage**:
+A list of idea names the learner marks as never met; the marked ones are
+recorded, the others still get a question.
+_Avoid_: survey, self-assessment
+
 **Evidence**:
-Answers and observed work; nothing else moves a number.
+Answers, observed work and names marked never met; nothing else moves a
+number.
 _Avoid_: data, history
 
 **Depth**:
@@ -125,6 +131,30 @@ _Avoid_: progress, completion
 Looking up the ideas a next step leans on, and asking what the lookup does not
 settle.
 _Avoid_: brief (for a single lookup), quiz
+
+## How it is taught
+
+**Turn**:
+One message from the agent.
+_Avoid_: response, round
+
+**Step**:
+One new idea, taught and checked; it takes one turn and one reply.
+_Avoid_: lesson (for a single idea), unit
+
+**Teaching turn**:
+A turn that teaches a step: feedback on the last reply, the idea the step
+grows from, the new idea, something for the learner to produce, and questions
+that keep the model up to date.
+
+**Repair**:
+A second turn on a step, after an answer that was wrong and confident.
+_Avoid_: remediation, re-teach
+
+**Plan**:
+The ideas on the way to a goal that the model does not show held, in the order
+they are taught.
+_Avoid_: curriculum, syllabus
 
 ## Retired terms (v0)
 

@@ -196,6 +196,19 @@ def test_observed_work_is_one_call(kioku):
     kioku("upkeep", "--check")
 
 
+def test_triage_records_the_names_never_met(kioku):
+    out = kioku("unmet", "increments", "QV", "--note", "opening").stdout
+    assert "2 idea(s) recorded as never met" in out
+    lines = evidence(kioku)
+    assert [l.split()[2:6] for l in lines] == [["p_aaaa", "triage", "again", "unseen"],
+                                              ["p_bbbb", "triage", "again", "unseen"]]
+    assert "never met it" in kioku("context", "increments").stdout
+    kioku("upkeep", "--check")
+    r = kioku("unmet", "increments", ok=False)  # it has an answer now: ask, don't triage
+    assert r.returncode == 1 and "already has answers" in r.stderr
+    assert "no idea `nope`" in kioku("unmet", "nope", ok=False).stderr
+
+
 # -- adding, editing, removing
 
 NEW = """## brownian-motion · definition · maths/probability/stochastic-calculus

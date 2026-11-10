@@ -33,11 +33,11 @@ are, how long your sessions usually are. Nothing about you goes anywhere else.
 - **kioku**, loaded by almost every session: the check (look up, decide, ask,
   pitch), the question block, and recording. Short on purpose; the formats are
   in `kioku ask -h`, `kioku add -h` and `kioku observed -h`.
-- **learn** teaches a goal in one session, one checked step at a time, each
-  step taught at the size of what you hold.
-- **pair** pair-programs: you type, the agent navigates. Library calls come as
-  materials and fade as you hold them; the ideas the code implements are
-  understood before they are typed.
+- **learn** teaches a goal in one session, one step per turn: each turn gives
+  feedback on your last reply, takes one new idea, and asks.
+- **pair** pair-programs: you type, the agent navigates. Each step is one
+  turn; library calls come as materials and shrink to a bare name as you hold
+  them, and you learn the idea a step implements by building it.
 
 Skills made for one person (your essay or paper workflow, your notes) belong
 in your own skills folder; they load the kioku skill and follow its check.
@@ -58,7 +58,8 @@ Ideas are added with `kioku add` (blocks on stdin), changed or moved with
 `kioku edit`, and removed with `kioku rm`, which moves any answers to
 `archive.md` rather than dropping them. An answer that should not count is set
 aside the same way with `kioku answer --retract`. A step of pairing work that
-a test verified is recorded with `kioku observed`.
+a test verified is recorded with `kioku observed`, and the names the learner
+marks as never met in a triage with `kioku unmet`.
 
 Evidence comes only from questions asked and answered and from verified work,
 never from conversation or self-report. A memory model (FSRS-6 for now, on

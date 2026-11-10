@@ -63,7 +63,7 @@ model only through a question they answer.
 
 ## Asking
 
-A **question block** is up to six numbered items, answered in one line. Write
+A **question block** is numbered questions answered in one line. Write
 it, pipe it into `kioku ask` (format and example: `kioku ask -h`), and copy the
 block it prints between the lines into your reply, verbatim: they never see
 tool output, and the block you wrote holds the answer key. Pass their
@@ -71,12 +71,24 @@ reply on as typed: `kioku answer <q_id> "<reply>"`, and grade say items with
 `--say N=good|hard|again`. Answer every ✗ in prose: the right answer and, for
 a misconception, why the wrong one tempts.
 
+**Triage** finds out fast what they have never met: show a lettered list of
+idea names, ask which they have never met, and record the marked ones with
+`kioku unmet` (`kioku unmet -h`). A name left unmarked still gets a real
+question before anything builds on it.
+
 An item measures the learner only when it stands alone (every term defined in
-it or earlier in the conversation, in their notation), you solved it yourself
-first, and each wrong option is the answer a specific wrong model would give.
+it or earlier in the conversation, in their notation; answerable without the
+other items), you solved it yourself first, and each wrong option is the
+answer a specific wrong model would give.
 Prefer applying an idea to reciting it. [questions.md](questions.md) has the
 full rules, the grades, and how to set aside an answer that should not count;
 read it before your first block in a session.
+
+## Teaching
+
+When a message of yours teaches an idea they do not hold, in a lesson, while
+pairing or in passing, read [turn.md](turn.md) first: one step per turn, what
+a turn does, and how it adapts to their last reply.
 
 ## Observed work
 

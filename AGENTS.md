@@ -31,5 +31,7 @@ model is the seam for later work: only `memory.recall` knows how R is computed.
 The CLI and the skills in `skills/` (`kioku`, always loaded; `learn`, which
 runs lessons; `pair`, which pair-programs) change together: a command change
 updates every skill that uses it in the same commit. Formats live in the CLI's
-help (`kioku ask -h`, `add -h`, `observed -h`); skills point there rather than
-repeat them. Run `uv run pytest` before committing.
+help (`kioku ask -h`, `add -h`, `observed -h`, `unmet -h`); skills point there
+rather than repeat them. How a turn teaches is written once, in
+`skills/kioku/turn.md`; `learn` and `pair` point there too. Run `uv run
+pytest` before committing.

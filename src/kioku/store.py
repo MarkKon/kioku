@@ -5,7 +5,7 @@
   areas/       the area tree: the ideas whose home is maths/analysis live in
                areas/maths/analysis.md, one `## name · kind · id` block each
   evidence.md  one answer per line, the only learner data
-  asks/        every question block asked (and every observed step), as JSON
+  asks/        every question block asked (and every observed step and triage), as JSON
   archive.md   evidence set aside, e.g. of removed ideas; nothing reads it
 
 Only this module knows the file formats.
@@ -32,8 +32,8 @@ FIELDS = ("needs", "uses", "aliases", "vault")
 
 HEADERS = {
     "evidence.md": "# Evidence\n\n"
-    "<!-- One line per answer, written by `kioku answer` and `kioku observed`:\n"
-    "     - YYYY-MM-DDTHH:MM <id> pick|write|say|observed <grade> [confidence] [mis|unseen|pre]"
+    "<!-- One line per answer, written by `kioku answer`, `kioku observed` and `kioku unmet`:\n"
+    "     - YYYY-MM-DDTHH:MM <id> pick|write|say|observed|triage <grade> [confidence] [mis|unseen|pre]"
     " [state|use|transfer] q_<ask>/<n> — <what they answered> -->\n\n",
     "profile.md": "# Learner profile\n\n"
     "<!-- Who the learner is. Every agent reads this once per session (`kioku profile`)\n"
@@ -51,7 +51,7 @@ ARCHIVE_HEADER = ("# Archive\n\nNot evidence: lines set aside, e.g. the answers 
 
 ANSWER_RE = re.compile(
     r"^- (?P<day>\d{4}-\d{2}-\d{2})(?:T(?P<time>\d{2}:\d{2}))? (?P<id>" + ID + r")"
-    r" (?P<kind>pick|write|say|observed)"
+    r" (?P<kind>pick|write|say|observed|triage)"
     r" (?P<grade>again|hard|good|easy|guess)"
     r"(?: (?P<conf>[0-9]))?"
     r"(?: (?P<flag>mis|unseen|pre))?"
